@@ -1,0 +1,98 @@
+|-----------------------------------------------------------------------|
+|                                                                       |
+|    OpenSeesPy EzBridge                                                |
+|    Version: 2.3                                                       |
+|                                                                       |
+|    Created on 08/02/2020                                              |
+|    Updated on 01/08/2020                                              |
+|    Author: Volkan Ozsarac                                             |
+|    Affiliation: University School for Advanced Studies IUSS Pavia     |
+|    Earthquake Engineering PhD Candidate                               |
+|                                                                       |
+|-----------------------------------------------------------------------|
+
+Capabilties of the current version
+-------------------------------------------------------------------------
+1) Deck: beam model, straight or curved, continuous or discontinous
+2) Bents: multiple bents, single pier with varying circular section (forceBeamColumn, np = 5)
+3) Deck-Bent Connectivity: Fix, Pin, User defined bearings (releases via link elements)
+4) Abutments: SDC 2010-2019 (CALTRANS) models / end restraints
+5) Foundation: p-y, t-z, q-z single pile (single layer - API 650), macro elements (elastic)
+6) Analyses Defined: MSA, IDA, NRHA (uniform - 3D, with varying angle of incidence), NSPA (uniform-modal), eigenvalue, gravity
+7) BentCap: Included (elasticBeamColumn)
+8) Expansion joints: Included (releases via link elements)
+
+Possible things to add in new versions
+-------------------------------------------------------------------------
+1) New type of RC Sections (e.g. Rectangular)
+2) Multiple piers in a single bent.
+3) New shear key models, new bearing models, new abutment models.
+4) Multiple support excitation (spatial variabilty)
+5) More piles per bent, more soil layers.
+6) Multi Linear type inelastic macro elements (user defined) for foundation.
+7) HFD model can be added for abutments, just the material info is different.
+
+How to use?
+-------------------------------------------------------------------------
+1) Prepare the required INPUTs (Main.py), the file is self explanatory
+2) Set the recorders (Recorders.py) for NRHA or NSPA
+3) Run Main.py
+
+	Parallel computing for different ground motion sets (IDA and MSA) in Linux OS
+	-------------------------------------------------------------------------
+	Mpich is required to use parallel processing with OpenSeesPy in Linux
+		• sudo apt-get update -y
+		• sudo apt-get install -y mpich
+	Change directory from termial: cd /mnt/d/EzBridge
+	Run the script using Mpich: mpiexec -np np python Main.py
+	where np is not the number of processors to use.
+	For example use 4 processors: mpiexec -np 4 python Main.py
+	Alternatively or each ground motion set to run open anaconda or python 
+	terminal in the model folder. If you are using anaconda, you may write: 
+	/home/volkan/anaconda3/bin/python3.7 Main.py
+
+	Parallel computing for different ground motion sets (IDA and MSA) in Windows OS
+	-------------------------------------------------------------------------
+	There is no way to use parallel processing option in Windows OS.
+	Instead several ground motion sets can be run at the same time using different terminals.
+	For each ground motion set to run open anaconda or python terminal in the model folder.
+	If you are using anaconda, you may write: 
+	C:\Users\Volkan\anaconda3\python.exe Main.py
+
+	Using through the DesignSafe or GoogleColab
+	-------------------------------------------------------------------------
+	Virtual machines might be working on either of Linux, Mac or Windows.
+	Thus EzBridge is built to work with any of these.
+	Step 1) Open a jupyter notebook
+	Step 2) Install or update the packages
+		!pip install --user --upgrade eqsig
+		!pip install --user --upgrade openseespy
+		!pip install --user  mpi4py
+	Step 3) Go to the EzBridge directory
+		%cd /home/jupyter/MyData/EzBridge (DesignSafe)
+		%cd /content/drive/My\ Drive/Colab\ Notebooks/EzBridge (Google Colab)
+	Step 4) Run the script you have prepared
+		!python Main.py (using single processor)
+		!mpiexec -np 4 python Main.py (e.g. using 4 processors)
+	Note: A modification is required to avoid temp files created in jupyter 
+	e.g. if run MSA from jupyter
+    gm_sets = []
+    for file in os.listdir(gmMSA):
+        if not file.startswith('.'): gm_sets.append(file)
+	
+	Notes
+	-------------------------------------------------------------------------
+	1) NSPA loading scheme can be modified by user. For now two options are available
+	Modal proportional and uniformly distributed loading schemes along the deck.
+	2) By default recorders only work with analysis options 2 (NSPA) and 3 (NRHA), and can be modified.
+	3) By default, if a single bearing (for each span end) is used, bentcap is not going to be created.
+	4) By default, at least two nodes are created for each span. Then end and start nodes of adjacent deck elements
+	are constrained using link elements. Bearings are placed underneath each deck node. Thus, there at least two bearing
+	elements on the top of each support, on both sides of bent cap.  
+	5) To account for expansion joints and diaphragms elastic link elements with reasonably high or low stiffness are used.
+	6) Releases are provided using link elements with reasonably high or low stiffness.
+	7) By default the first procedure in Utility\NRHA.py, which is used for NRHA and IDA, returns only peak column drift ratio for piers.
+	Whereas the second routine, which is used for MSA returns multiple EDPs: peak column drift ratio, curvature ductility and displacement ductility.
+	The second procedure requires the dictionary called PierDict as an entry to calculate these EDPs upon completing the analysis step.
+	PierDict is prepared inside Utility\PierInfo.py
+	8) Mean Replacement Cost and Repair Cost Ratios in accordance with ANAS 2018 can be estimated with Utility\CostEstimation.py
