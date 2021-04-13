@@ -1551,8 +1551,8 @@ class Builder(RC_Circular):
         L = self.model['BentCap']['L']
 
         if self.model['Bearing']['N'] == 1 and self.num_piers == 1:
+            self.PointLoadsBcap = []  # BentCap point Loads
             for i in range(self.num_bents):  # do not model bentcap (simply there is no need)
-                self.PointLoadsBcap = []  # BentCap point Loads
                 self.RigidLinkNodes.append([self.BcapNodes[i][0], self.BentEndNodes[i][0]])
                 Pload = h * w * L * gamma_c
                 mass = Pload / g
@@ -1658,6 +1658,218 @@ class Builder(RC_Circular):
             self.fixed_AB1Nodes = self.AB1Nodes
             self.fixed_AB2Nodes = self.AB2Nodes
 
+        elif self.model['Abutment']['Type'] == 'Elastic':
+            # INPUTS
+            Kx = self.model['Abutment']['Kx']
+            Ky = self.model['Abutment']['Ky']
+            Kz = self.model['Abutment']['Kz']
+            Krx = self.model['Abutment']['Krx']
+            Kry = self.model['Abutment']['Kry']
+            Krz = self.model['Abutment']['Krz']
+            skew1 = self.skew[0]
+            skew2 = self.skew[-1]
+
+            MatTags1 = []
+            self.EndMatTag += 1
+            MatTags1.append(self.EndMatTag)
+            ops.uniaxialMaterial('Elastic', self.EndMatTag, Kx[0])
+            self.EndMatTag += 1
+            MatTags1.append(self.EndMatTag)
+            ops.uniaxialMaterial('Elastic', self.EndMatTag, Ky[0])
+            self.EndMatTag += 1
+            MatTags1.append(self.EndMatTag)
+            ops.uniaxialMaterial('Elastic', self.EndMatTag, Kz[0])
+            self.EndMatTag += 1
+            MatTags1.append(self.EndMatTag)
+            ops.uniaxialMaterial('Elastic', self.EndMatTag, Krx[0])
+            self.EndMatTag += 1
+            MatTags1.append(self.EndMatTag)
+            ops.uniaxialMaterial('Elastic', self.EndMatTag, Kry[0])
+            self.EndMatTag += 1
+            MatTags1.append(self.EndMatTag)
+            ops.uniaxialMaterial('Elastic', self.EndMatTag, Krz[0])
+
+            MatTags2 = []
+            self.EndMatTag += 1
+            MatTags2.append(self.EndMatTag)
+            ops.uniaxialMaterial('Elastic', self.EndMatTag, Kx[1])
+            self.EndMatTag += 1
+            MatTags2.append(self.EndMatTag)
+            ops.uniaxialMaterial('Elastic', self.EndMatTag, Ky[1])
+            self.EndMatTag += 1
+            MatTags2.append(self.EndMatTag)
+            ops.uniaxialMaterial('Elastic', self.EndMatTag, Kz[1])
+            self.EndMatTag += 1
+            MatTags2.append(self.EndMatTag)
+            ops.uniaxialMaterial('Elastic', self.EndMatTag, Krx[1])
+            self.EndMatTag += 1
+            MatTags2.append(self.EndMatTag)
+            ops.uniaxialMaterial('Elastic', self.EndMatTag, Kry[1])
+            self.EndMatTag += 1
+            MatTags2.append(self.EndMatTag)
+            ops.uniaxialMaterial('Elastic', self.EndMatTag, Krz[1])
+
+            # Start Abutment Coordinates
+            Abut1_C = int('11' + self.ATag)  # Centroid for rigid links to bearings
+            Abut1_CF = int('10' + self.ATag)  # fixed end
+            Coords1_C = np.array(
+                [self.model['Deck']['Xs'][0], self.model['Deck']['Ys'][0], self.model['Deck']['Zs'][0]],
+                dtype=float)
+            Coords1_C[2] = Coords1_C[2] - self.model['Bearing']['dv'] - self.model['Bearing']['h']
+
+            # End Abutment Coordinates
+            Abut2_C = int('21' + self.ATag)  # Centroid for rigid links to bearings
+            Abut2_CF = int('20' + self.ATag)  # fixed end
+            Coords2_C = np.array(
+                [self.model['Deck']['Xs'][-1], self.model['Deck']['Ys'][-1], self.model['Deck']['Zs'][-1]],
+                dtype=float)
+            Coords2_C[2] = Coords2_C[2] - (self.model['Bearing']['dv'] + self.model['Bearing']['h'])
+
+            Coords1_C = np.round(Coords1_C, 5)
+            Coords2_C = np.round(Coords2_C, 5)
+
+            # Create Nodes for Abutment Springs
+            ops.node(Abut1_C, *Coords1_C.tolist(), '-mass', 0, 0, 0, 0, 0, 0)
+            ops.node(Abut1_CF, *Coords1_C.tolist())
+            ops.node(Abut2_C, *Coords2_C.tolist(), '-mass', 0, 0, 0, 0, 0, 0)
+            ops.node(Abut2_CF, *Coords2_C.tolist(), '-mass', 0, 0, 0, 0, 0, 0)
+
+            dirs = [1, 2, 3, 4, 5, 6]
+            ops.element('zeroLength', int('10' + self.AbutTag), Abut1_CF, Abut1_C, '-mat', *MatTags1, '-dir', *dirs,
+                        '-orient', np.cos(skew1), np.sin(skew1), 0, 0, 1, 0)
+            ops.element('zeroLength', int('20' + self.AbutTag), Abut2_CF, Abut2_C, '-mat', *MatTags2, '-dir', *dirs,
+                        '-orient', np.cos(skew2), np.sin(skew2), 0, 0, 1, 0)
+
+            # Fix the springs
+            ops.fix(Abut1_CF, 1, 1, 1, 1, 1, 1)
+            ops.fix(Abut2_CF, 1, 1, 1, 1, 1, 1)
+
+            # Rigid links
+            for node in self.AB1Nodes:
+                self.RigidLinkNodes.append([Abut1_C, node])
+            for node in self.AB2Nodes:
+                self.RigidLinkNodes.append([Abut2_C, node])
+
+            self.fixed_AB1Nodes = [Abut1_CF]
+            self.fixed_AB2Nodes = [Abut2_CF]
+
+            self.EleIDsAB1 = [int('10' + self.AbutTag)]
+            self.EleIDsAB2 = [int('20' + self.AbutTag)]
+
+        elif self.model['Abutment']['Type'] == 'UserDefined':
+            # INPUTS
+            Fyx = self.model['Abutment']['Fyx']
+            Fyy = self.model['Abutment']['Fyy']
+            bx = self.model['Abutment']['bx']
+            by = self.model['Abutment']['by']
+            Kx = self.model['Abutment']['Kx']
+            Ky = self.model['Abutment']['Ky']
+            Kz = self.model['Abutment']['Kz']
+            Krx = self.model['Abutment']['Krx']
+            Kry = self.model['Abutment']['Kry']
+            Krz = self.model['Abutment']['Krz']
+            skew1 = self.skew[0]
+            skew2 = self.skew[-1]
+
+            MatTags1 = []
+            self.EndMatTag += 1
+            MatTags1.append(self.EndMatTag)
+            if Fyx[0] == 0:
+                ops.uniaxialMaterial('Elastic', self.EndMatTag, Kx[0])
+            else:
+                ops.uniaxialMaterial('Steel01', self.EndMatTag, Fyx[0], Kx[0], bx[0])
+            self.EndMatTag += 1
+            MatTags1.append(self.EndMatTag)
+            if Fyy[0] == 0:
+                ops.uniaxialMaterial('Elastic', self.EndMatTag, Ky[0])
+            else:
+                ops.uniaxialMaterial('Steel01', self.EndMatTag, Fyy[0], Ky[0], bx[0])
+            self.EndMatTag += 1
+            MatTags1.append(self.EndMatTag)
+            ops.uniaxialMaterial('Elastic', self.EndMatTag, Kz[0])
+            self.EndMatTag += 1
+            MatTags1.append(self.EndMatTag)
+            ops.uniaxialMaterial('Elastic', self.EndMatTag, Krx[0])
+            self.EndMatTag += 1
+            MatTags1.append(self.EndMatTag)
+            ops.uniaxialMaterial('Elastic', self.EndMatTag, Kry[0])
+            self.EndMatTag += 1
+            MatTags1.append(self.EndMatTag)
+            ops.uniaxialMaterial('Elastic', self.EndMatTag, Krz[0])
+
+            MatTags2 = []
+            self.EndMatTag += 1
+            MatTags2.append(self.EndMatTag)
+            if Fyx[0] == 0:
+                ops.uniaxialMaterial('Elastic', self.EndMatTag, Kx[1])
+            else:
+                ops.uniaxialMaterial('Steel01', self.EndMatTag, Fyx[1], Kx[1], bx[1])
+            self.EndMatTag += 1
+            MatTags2.append(self.EndMatTag)
+            if Fyy[0] == 0:
+                ops.uniaxialMaterial('Elastic', self.EndMatTag, Ky[1])
+            else:
+                ops.uniaxialMaterial('Steel01', self.EndMatTag, Fyy[1], Ky[1], by[1])
+            self.EndMatTag += 1
+            MatTags2.append(self.EndMatTag)
+            ops.uniaxialMaterial('Elastic', self.EndMatTag, Kz[1])
+            self.EndMatTag += 1
+            MatTags2.append(self.EndMatTag)
+            ops.uniaxialMaterial('Elastic', self.EndMatTag, Krx[1])
+            self.EndMatTag += 1
+            MatTags2.append(self.EndMatTag)
+            ops.uniaxialMaterial('Elastic', self.EndMatTag, Kry[1])
+            self.EndMatTag += 1
+            MatTags2.append(self.EndMatTag)
+            ops.uniaxialMaterial('Elastic', self.EndMatTag, Krz[1])
+
+            # Start Abutment Coordinates
+            Abut1_C = int('11' + self.ATag)  # Centroid for rigid links to bearings
+            Abut1_CF = int('10' + self.ATag)  # fixed end
+            Coords1_C = np.array(
+                [self.model['Deck']['Xs'][0], self.model['Deck']['Ys'][0], self.model['Deck']['Zs'][0]],
+                dtype=float)
+            Coords1_C[2] = Coords1_C[2] - self.model['Bearing']['dv'] - self.model['Bearing']['h']
+
+            # End Abutment Coordinates
+            Abut2_C = int('21' + self.ATag)  # Centroid for rigid links to bearings
+            Abut2_CF = int('20' + self.ATag)  # fixed end
+            Coords2_C = np.array(
+                [self.model['Deck']['Xs'][-1], self.model['Deck']['Ys'][-1], self.model['Deck']['Zs'][-1]],
+                dtype=float)
+            Coords2_C[2] = Coords2_C[2] - (self.model['Bearing']['dv'] + self.model['Bearing']['h'])
+
+            Coords1_C = np.round(Coords1_C, 5)
+            Coords2_C = np.round(Coords2_C, 5)
+
+            # Create Nodes for Abutment Springs
+            ops.node(Abut1_C, *Coords1_C.tolist(), '-mass', 0, 0, 0, 0, 0, 0)
+            ops.node(Abut1_CF, *Coords1_C.tolist())
+            ops.node(Abut2_C, *Coords2_C.tolist(), '-mass', 0, 0, 0, 0, 0, 0)
+            ops.node(Abut2_CF, *Coords2_C.tolist(), '-mass', 0, 0, 0, 0, 0, 0)
+
+            dirs = [1, 2, 3, 4, 5, 6]
+            ops.element('zeroLength', int('10' + self.AbutTag), Abut1_CF, Abut1_C, '-mat', *MatTags1, '-dir', *dirs,
+                        '-orient', np.cos(skew1), np.sin(skew1), 0, 0, 1, 0)
+            ops.element('zeroLength', int('20' + self.AbutTag), Abut2_CF, Abut2_C, '-mat', *MatTags2, '-dir', *dirs,
+                        '-orient', np.cos(skew2), np.sin(skew2), 0, 0, 1, 0)
+
+            # Fix the springs
+            ops.fix(Abut1_CF, 1, 1, 1, 1, 1, 1)
+            ops.fix(Abut2_CF, 1, 1, 1, 1, 1, 1)
+
+            # Rigid links
+            for node in self.AB1Nodes:
+                self.RigidLinkNodes.append([Abut1_C, node])
+            for node in self.AB2Nodes:
+                self.RigidLinkNodes.append([Abut2_C, node])
+
+            self.fixed_AB1Nodes = [Abut1_CF]
+            self.fixed_AB2Nodes = [Abut2_CF]
+
+            self.EleIDsAB1 = [int('10' + self.AbutTag)]
+            self.EleIDsAB2 = [int('20' + self.AbutTag)]
+
         elif self.model['Abutment']['Type'] == 'SDC 2019':
             # Notes:
             # Embankment width = Abutment Width, Bc
@@ -1677,8 +1889,8 @@ class Builder(RC_Circular):
             gap = self.model['Abutment']['gap']
             skew1 = self.skew[0]
             skew2 = self.skew[-1]
-            mass = h * w * b / 3  # approximate abutment mass
-            # mass = 0
+            # mass = h * w * b / 3  # approximate abutment mass
+            mass = 0
 
             # Create gap elements in longitudinal direction, if gap is a nonzero value 
             if gap != 0 and self.model['Abutment']['gapFlag'] == 1:
@@ -1742,25 +1954,25 @@ class Builder(RC_Circular):
 
             # Transverse Springs / CALTRANS - SDC 2019: Section 4.3.1, Figure 4.3.1-2
             # The assumption is that sacrificial shear key is used where gap is 2 inches
-            dy_T1 = 2 * inch
-            PabutT_1 = 0.3 * self.AB1AxialForces
-            KabutT_1 = PabutT_1 / dy_T1
-            
-            dy_T2 = 2 * inch
-            PabutT_2 = 0.3 * self.AB2AxialForces
-            KabutT_2 = PabutT_2 / dy_T2
+            # dy_T1 = 2 * inch
+            # PabutT_1 = 0.3 * self.AB1AxialForces
+            # KabutT_1 = PabutT_1 / dy_T1
+            #
+            # dy_T2 = 2 * inch
+            # PabutT_2 = 0.3 * self.AB2AxialForces
+            # KabutT_2 = PabutT_2 / dy_T2
 
             # Alternatively, approach by Maroney and Chai (1994) can be followed
             # Transverse backfill pressure facator is CL*CW = 2/3*4/3 according to Maroney and Chai (1994).
-            # CL = 2 / 3  # Wingwall effectiveness coefficient
-            # CW = 4 / 3  # Wingwall participation coefficient
-            # ratio = 0.5  # The wing wall length can be assumed 1/2-1/3 of the back-wall length
-            # PabutT_1 = PabutL_1 * ratio * CL * CW
-            # KabutT_1 = KabutL_1 * ratio * CL * CW
-            # # dy_T1 = PabutT_1/KabutT_1
-            # PabutT_2 = PabutL_2 * ratio * CL * CW
-            # KabutT_2 = KabutL_2 * ratio * CL * CW
-            # dy_T2 = PabutT_2/KabutT_2
+            CL = 2 / 3  # Wingwall effectiveness coefficient
+            CW = 4 / 3  # Wingwall participation coefficient
+            ratio = 0.5  # The wing wall length can be assumed 1/2-1/3 of the back-wall length
+            PabutT_1 = PabutL_1 * ratio * CL * CW
+            KabutT_1 = KabutL_1 * ratio * CL * CW
+            # dy_T1 = PabutT_1/KabutT_1
+            PabutT_2 = PabutL_2 * ratio * CL * CW
+            KabutT_2 = KabutL_2 * ratio * CL * CW
+            dy_T2 = PabutT_2/KabutT_2
 
             if self.model['Abutment']['spring'] == 1:
                 r = 1e-4  # strain hardening to prevent 0 stiffness
@@ -1989,7 +2201,8 @@ class Builder(RC_Circular):
                 self.EleIDsAB2 = [int('21' + self.AbutTag), int('22' + self.AbutTag)]
 
     def _foundation(self):
-        # TODO: Lumped plasticity approach is missing for pile elements
+        # TODO: p-y springs are not defined for liquefaction susceptible soils, t-z and q-z springs are defined
+        #  based on sand, the equations to derive qult and tult might be different for clays.
         #  ------------------------------------------------------------------------------------------------------------
         #  FOUNDATION MODELLING
         #  ------------------------------------------------------------------------------------------------------------
@@ -2135,11 +2348,9 @@ class Builder(RC_Circular):
                         pyDepth += hlayer / 2
 
                         node_fixed = int(str(count) + self.Found1Tag)
-                        node_embedded = int(str(count) + self.Found2Tag)
                         node_pile = int(str(count) + self.Found3Tag)
 
                         ops.node(node_fixed, *coords.tolist())
-                        ops.node(node_embedded, *coords.tolist())
                         ops.node(node_pile, *coords.tolist())
 
                         pile_nodes.append(node_pile)
@@ -2156,61 +2367,32 @@ class Builder(RC_Circular):
                         matTags = [self.EndMatTag, self.EndMatTag]
                         dirs = [1, 2]
 
-                        ### !!! Uncomment this part if you wanna consider vertical springs
-                        # matTags.append(self.BigMat) # comment this for t-z
-                        # # vertical effective stress at current depth    
+                        ## !!! Comment this part if you do not want to consider vertical springs
+                        # vertical effective stress at current depth
                         # sigV = gamma * pyDepth
-                        # # procedure to define tult and z50
                         # self.EndMatTag += 1
-                        # z50, tult = get_tzParam(phiDegree, Diameter, sigV, pEleLength)
-                        # ops.uniaxialMaterial('TzSimple1', self.EndMatTag, soilType, tult, z50, 0.0)
+                        # # I am not sure if this makes sense for clays, but ok
+                        # if j == len(data['Layer ID']) - 1: # q-z spring
+                        #     z50, qult = get_qzParam(phiDegree, Diameter, sigV, Gsoil)
+                        #     ops.uniaxialMaterial('QzSimple1', self.EndMatTag, soilType, qult, z50)
+                        # else: # t-z spring
+                        #     z50, tult = get_tzParam(phiDegree, Diameter, sigV, pEleLength)
+                        #     ops.uniaxialMaterial('TzSimple1', self.EndMatTag, soilType, tult, z50, 0.0)
                         # matTags.append(self.EndMatTag)
                         # dirs.append(3)
 
+                        # !!! Uncomment this part if restraint is assigned instead of vertical springs at the bottom
+                        if j == len(data['Layer ID']) - 1:
+                            ops.fix(node_pile, 0, 0, 1, 0, 0, 0)
+
                         eletag = int(str(count) + self.SpringEleTag)
                         springIDs.append(eletag)
-                        ops.element('zeroLength', eletag, node_fixed, node_embedded, '-mat', *matTags, '-dir', *dirs)
+                        ops.element('zeroLength', eletag, node_fixed, node_pile, '-mat', *matTags, '-dir', *dirs)
                         ops.fix(node_fixed, 1, 1, 1, 1, 1, 1)
-                        ops.fix(node_embedded, 0, 0, 0, 1, 1, 1)
-                        ops.equalDOF(node_pile, node_embedded, 1, 2, 3)
 
                         # update the nodal coordinate
                         coords[2] = coords[2] - hlayer / 2
                         pyDepth += hlayer / 2
-
-                        if j == len(data['Layer ID']) - 1:
-                            count += 1
-                            node_pile = int(str(count) + self.Found3Tag)
-                            ops.node(node_pile, *coords.tolist())
-                            ops.fix(node_pile, 0, 0, 1, 0, 0, 0)
-                            pile_nodes.append(node_pile)
-                            fixed_nodes.append(node_pile)
-
-                            # uncomment to define Q-z spring instead                        
-                            # node_fixed = int(str(count)+self.Found1Tag)
-                            # node_embedded = int(str(count)+self.Found2Tag)
-                            # node_pile = int(str(count)+self.Found3Tag)
-                            # ops.node(node_fixed, *coords.tolist())                        
-                            # ops.node(node_embedded, *coords.tolist())
-                            # ops.node(node_pile, *coords.tolist())
-                            # pile_nodes.append(node_pile)
-                            # embedded_nodes.append(node_embedded)
-                            # fixed_nodes.append(node_fixed)
-                            # sigV = gamma * pyDepth
-                            # self.EndMatTag += 1
-                            # z50, qult = get_qzParam(phiDegree, Diameter, sigV, Gsoil)
-                            # ops.uniaxialMaterial('QzSimple1', self.EndMatTag, soilType, qult, z50)
-                            # ops.element('zeroLength', eletag, node_fixed, node_embedded, '-mat', *matTags, '-dir', 3)   
-
-                    # if k == 1: sys.exit()
-                    ### TODO: -1 change this part, get pile int from a function
-                    # we may make these elements inelastic fiber sections
-                    # create the sections
-                    # A, Iy, Iz, J = getCircProp(Diameter)  # Mechanical properties
-                    # self.EndSecTag += 1
-                    # self.EndIntTag += 1
-                    # ops.section('Elastic', self.EndSecTag, E, A, Iz, Iy, G, J)
-                    # ops.beamIntegration('Legendre', self.EndIntTag, self.EndSecTag, 2)
 
                     IntTag = IntTags[i]
                     wTOT = PileWs[i]
@@ -2224,13 +2406,11 @@ class Builder(RC_Circular):
                     # Define geometric transformation of the bent
                     self.EndTransfTag += 1  # local z is in global x
                     ops.geomTransf('Linear', self.EndTransfTag, np.cos(skew), np.sin(skew), 0)
-                    # eleType = 'dispBeamColumn'
-                    # wTOT = A * gamma_c
                     for j in range(len(pile_nodes) - 1):
                         eleTag = int(str(count2) + self.PileEleTag)
                         nodeJ = pile_nodes[j]
                         nodeI = pile_nodes[j + 1]
-                        ops.element(eleType, eleTag, nodeI, nodeJ, self.EndTransfTag, self.EndIntTag, '-mass',
+                        ops.element(eleType, eleTag, nodeI, nodeJ, self.EndTransfTag, IntTag, '-mass',
                                     wTOT / g, self.mass_type)
                         eleIDs.append(eleTag)
                         count2 += 1
@@ -2305,7 +2485,6 @@ class Builder(RC_Circular):
             count1 = 0
             count2 = 0
             self.pile_nodes = []
-            self.embedded_nodes = []
             self.fixed_BentNodes = []
             self.EleIDsPY = []  # PY spring element IDs  
             self.EleIDsPile = []  # Pile element IDs      
@@ -2336,8 +2515,8 @@ class Builder(RC_Circular):
                 sheet = 'Bent' + str(i + 1)
                 data = pd.read_excel(open('SoilProfiles.xlsx', 'rb'),
                                      sheet_name=sheet)
-
-                Diameter = self.model['Foundation']['D'][i]
+                idx = self.model['Foundation']['Sections'][i] - 1
+                Diameter = self.model['Foundation']['D'][idx]
                 nx = self.model['Foundation']['nx'][i]
                 ny = self.model['Foundation']['ny'][i]
                 sx = self.model['Foundation']['sx'][i]
@@ -2408,16 +2587,15 @@ class Builder(RC_Circular):
                         pyDepth += hlayer / 2
 
                         node_fixed = int(str(count1) + self.Found1Tag)
-                        node_embedded = int(str(count1) + self.Found2Tag)
                         node_pile = int(str(count1) + self.Found3Tag)
 
                         ops.node(node_fixed, *coords)
-                        ops.node(node_embedded, *coords)
                         ops.node(node_pile, *coords)
 
                         pile_nodes.append(node_pile)
                         fixed_nodes.append(node_fixed)
 
+                        # P-y springs
                         if soilType == 1:
                             y50, pult = get_pyParam_clay(pyDepth, gamma, cu, eps50, Diameter, pEleLength, soil)
                         elif soilType == 2:
@@ -2432,51 +2610,32 @@ class Builder(RC_Circular):
                         matTags.append(self.EndMatTag)
                         dirs = [1, 2]
 
-                        ### !!! Uncomment this part if you wanna consider vertical springs
-                        # matTags.append(self.BigMat) # comment this for t-z
-                        # # vertical effective stress at current depth    
+                        # ## !!! Comment this part if you do not want to consider vertical springs
+                        # # vertical effective stress at current depth
                         # sigV = gamma * pyDepth
-                        # # procedure to define tult and z50
                         # self.EndMatTag += 1
-                        # z50, tult = get_tzParam(phiDegree, Diameter, sigV, pEleLength)
-                        # ops.uniaxialMaterial('TzSimple1', self.EndMatTag, soilType, tult, z50, 0.0)
+                        # # I am not sure if this makes sense for clays, but ok
+                        # if j == len(data['Layer ID']) - 1: # q-z spring
+                        #     z50, qult = get_qzParam(phiDegree, Diameter, sigV, Gsoil)
+                        #     ops.uniaxialMaterial('QzSimple1', self.EndMatTag, soilType, qult, z50)
+                        # else: # t-z spring
+                        #     z50, tult = get_tzParam(phiDegree, Diameter, sigV, pEleLength)
+                        #     ops.uniaxialMaterial('TzSimple1', self.EndMatTag, soilType, tult, z50, 0.0)
                         # matTags.append(self.EndMatTag)
                         # dirs.append(3)
 
+                        # !!! Uncomment this part if restraint is assigned instead of vertical springs at the bottom
+                        if j == len(data['Layer ID']) - 1:
+                            ops.fix(node_pile, 0, 0, 1, 0, 0, 0)
+
                         eletag = int(str(count1) + self.SpringEleTag)
                         springIDs.append(eletag)
-                        ops.element('zeroLength', eletag, node_fixed, node_embedded, '-mat', *matTags, '-dir', *dirs)
+                        ops.element('zeroLength', eletag, node_fixed, node_pile, '-mat', *matTags, '-dir', *dirs)
                         ops.fix(node_fixed, 1, 1, 1, 1, 1, 1)
-                        ops.fix(node_embedded, 0, 0, 0, 1, 1, 1)
-                        ops.equalDOF(node_pile, node_embedded, 1, 2, 3)
 
                         # update the nodal coordinate
                         coords[2] = coords[2] - hlayer / 2
                         pyDepth += hlayer / 2
-
-                        if j == len(data['Layer ID']) - 1:
-                            count1 += 1
-                            node_pile = int(str(count1) + self.Found3Tag)
-                            ops.node(node_pile, *coords)
-                            ops.fix(node_pile, 0, 0, 1, 0, 0, 0)
-                            pile_nodes.append(node_pile)
-                            fixed_nodes.append(node_pile)
-
-                            # uncomment to define Q-z spring instead                        
-                            # node_fixed = int(str(count)+self.Found1Tag)
-                            # node_embedded = int(str(count)+self.Found2Tag)
-                            # node_pile = int(str(count)+self.Found3Tag)
-                            # ops.node(node_fixed, *coords.tolist())                        
-                            # ops.node(node_embedded, *coords.tolist())
-                            # ops.node(node_pile, *coords.tolist())
-                            # pile_nodes.append(node_pile)
-                            # embedded_nodes.append(node_embedded)
-                            # fixed_nodes.append(node_fixed)
-                            # sigV = gamma * pyDepth
-                            # self.EndMatTag += 1
-                            # z50, qult = get_qzParam(phiDegree, Diameter, sigV, Gsoil)
-                            # ops.uniaxialMaterial('QzSimple1', self.EndMatTag, soilType, qult, z50)
-                            # ops.element('zeroLength', eletag, node_fixed, node_embedded, '-mat', *matTags, '-dir', 3)   
 
                     IntTag = IntTags[i]
                     wTOT = PileWs[i]
@@ -2485,8 +2644,7 @@ class Builder(RC_Circular):
                     else:
                         eleType = 'forceBeamColumn'
 
-
-                    # create elements                
+                    # create elements
                     skew = (self.skew[i] + self.skew[i + 1]) / 2
                     # Define geometric transformation of the bent
                     self.EndTransfTag += 1  # local z is in global x

@@ -331,7 +331,6 @@ class Main(Builder, BridgeSummary, PierInfo):
         if self.model['Bearing']['N'] == 1 and self.num_piers == 1:
             for i in range(self.num_bents):
                 ops.load(self.BcapNodes[i][0], 0, 0, -self.PointLoadsBcap[i], 0, 0, 0)
-                self.BcapNodes[i][0]
         else:
             for i in range(len(self.EleIDsBcap)):
                 EleNodes = ops.eleNodes(self.EleIDsBcap[i])

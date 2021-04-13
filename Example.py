@@ -189,7 +189,7 @@ inputs = {
         # 'TransReinfType': ['Hoops'],  # Type of transversal steel, 'Hoops' or 'Spirals'
 
         'Type': 'Group Pile',  # Foundation Type (Fixed, Macro elements, Pile-Shaft, Group Pile)
-        'EleType': 0,
+        'EleType': 2,
         # 0: Displacement-Based Beam column element with elastic section
         # 1: Displacement-Based Beam column element with inelastic fiber section
         # - Gauss Legendre with 2 gauss points
@@ -209,8 +209,8 @@ inputs = {
         'TransReinfType': ['Hoops'],  # Type of transversal steel, 'Hoops' or 'Spirals'
         'cap_t': 2 * m,  # pile cap thickness
         'cap_A': 50 * m ** 2,  # pile cap area
-        'nx': [3],  # number of rows in x dir
-        'ny': [3],  # number of rows in y dir
+        'nx': [2],  # number of rows in x dir
+        'ny': [4],  # number of rows in y dir
         'sx': [3 * m],  # spacing in x dir
         'sy': [3 * m],  # spacing in y dir
     }
