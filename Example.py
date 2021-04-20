@@ -223,7 +223,7 @@ inputs = {
 GMs = ['RSN1158_KOCAELI_DZC270.txt', 'RSN1158_KOCAELI_DZC180.txt', 'RSN1158_KOCAELI_DZC-UP.txt']
 GMcomponents = [1, 2]
 GMfactors = [1, 1]
-signal = '-disp'
+signal = '-accel'
 
 # GMs = ['RSN1158_KOCAELI_DZC270.AT2']
 # GMcomponents = [1]
