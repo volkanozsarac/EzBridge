@@ -1091,28 +1091,17 @@ class Main(Builder, BridgeSummary, PierInfo):
         def Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag, SupportNode=None, SF = 9.81):
             # Define the Time Series and and the Load Pattern
             for i in range(1, 4):
-                Ag = gm_mat[i - 1, :]
-                t = np.linspace(0, (len(Ag) - 1) * GMdt, len(Ag))
-                # Get ground velocity and displacement through integration
-                Vg = cumtrapz(Ag, t, initial=0)
-                Dg = cumtrapz(Vg, t, initial=0)    
+                gm_i = gm_mat[i - 1, :]
                     
                 # Creating UniformExcitation load pattern
                 if excitation == 'Uniform':
                     # Setting time series to be passed to uniform excitation
-                    ops.timeSeries('Path', tsTag, '-dt', GMdt, '-values', *list(Ag), '-factor', SF)
+                    ops.timeSeries('Path', tsTag, '-dt', GMdt, '-values', *list(gm_i), '-factor', SF)
                     ops.pattern('UniformExcitation', pTag, i, '-accel', tsTag)
                 
                 elif excitation == 'Multi-Support':
-                    if signal == '-accel':
-                        # Setting time series to be passed to uniform excitation
-                        ops.timeSeries('Path', tsTag, '-dt', GMdt, '-values', *list(Ag), '-factor', SF)
-                    elif signal == '-vel':
-                        # Setting time series to be passed to uniform excitation
-                        ops.timeSeries('Path', tsTag, '-dt', GMdt, '-values', *list(Vg), '-factor', SF)
-                    elif signal == '-disp':
-                        # Setting time series to be passed to uniform excitation
-                        ops.timeSeries('Path', tsTag, '-dt', GMdt, '-values', *list(Dg), '-factor', SF)
+                    # Setting time series to be passed to uniform excitation
+                    ops.timeSeries('Path', tsTag, '-dt', GMdt, '-values', *list(gm_i), '-factor', SF)
                     # Creating MultipleSupport Excitation load pattern                        
                     ops.pattern('MultipleSupport', pTag)
                     ops.groundMotion(gmTag, 'Plain', signal,  tsTag)
@@ -1159,7 +1148,8 @@ class Main(Builder, BridgeSummary, PierInfo):
 
             if damping == 'Rayleigh':
                 # Compute the Rayleigh damping
-                Lambda = self._eigen(max(Modes))
+                numEigen = int(max(Modes))
+                Lambda = self._eigen(numEigen)
                 Omega = Lambda ** 0.5
                 wi = Omega[Modes[0] - 1]
                 wj = Omega[Modes[1] - 1]
@@ -1366,36 +1356,27 @@ class Main(Builder, BridgeSummary, PierInfo):
             return gm_mat, GM_dur, GMdt
 
         def Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag, SupportNode=None, SF = 9.81):
-
-            Ag = gm_mat[i - 1, :]
-            t = np.linspace(0, (len(Ag) - 1) * GMdt, len(Ag))
-            # Get ground velocity and displacement through integration
-            Vg = cumtrapz(Ag, t, initial=0)
-            Dg = cumtrapz(Vg, t, initial=0)    
+            # Define the Time Series and and the Load Pattern
+            for i in range(1, 4):
+                gm_i = gm_mat[i - 1, :]
+                    
+                # Creating UniformExcitation load pattern
+                if excitation == 'Uniform':
+                    # Setting time series to be passed to uniform excitation
+                    ops.timeSeries('Path', tsTag, '-dt', GMdt, '-values', *list(gm_i), '-factor', SF)
+                    ops.pattern('UniformExcitation', pTag, i, '-accel', tsTag)
                 
-            # Creating UniformExcitation load pattern
-            if excitation == 'Uniform':
-                # Setting time series to be passed to uniform excitation
-                ops.timeSeries('Path', tsTag, '-dt', GMdt, '-values', *list(Ag), '-factor', SF)
-                ops.pattern('UniformExcitation', pTag, i, '-accel', tsTag)
-            
-            elif excitation == 'Multi-Support':
-                if signal == '-accel':
+                elif excitation == 'Multi-Support':
                     # Setting time series to be passed to uniform excitation
-                    ops.timeSeries('Path', tsTag, '-dt', GMdt, '-values', *list(Ag), '-factor', SF)
-                elif signal == '-vel':
-                    # Setting time series to be passed to uniform excitation
-                    ops.timeSeries('Path', tsTag, '-dt', GMdt, '-values', *list(Vg), '-factor', SF)
-                elif signal == '-disp':
-                    # Setting time series to be passed to uniform excitation
-                    ops.timeSeries('Path', tsTag, '-dt', GMdt, '-values', *list(Dg), '-factor', SF)
-                # Creating MultipleSupport Excitation load pattern                        
-                ops.pattern('MultipleSupport', pTag)
-                ops.groundMotion(gmTag, 'Plain', signal,  tsTag)
-                ops.imposedMotion(SupportNode, i, gmTag)
-            tsTag += 1
-            pTag += 1
-            gmTag += 1
+                    ops.timeSeries('Path', tsTag, '-dt', GMdt, '-values', *list(gm_i), '-factor', SF)
+                    # Creating MultipleSupport Excitation load pattern                        
+                    ops.pattern('MultipleSupport', pTag)
+                    ops.groundMotion(gmTag, 'Plain', signal,  tsTag)
+                    ops.imposedMotion(SupportNode, i, gmTag)
+                    
+                tsTag += 1
+                pTag += 1
+                gmTag += 1
                 
             return tsTag, pTag, gmTag
 
@@ -1538,7 +1519,8 @@ class Main(Builder, BridgeSummary, PierInfo):
             
                         if damping == 'Rayleigh':
                             # Compute the Rayleigh damping
-                            Lambda = self._eigen(max(Modes))
+                            numEigen = int(max(Modes))
+                            Lambda = self._eigen(numEigen)
                             Omega = Lambda ** 0.5
                             wi = Omega[Modes[0] - 1]
                             wj = Omega[Modes[1] - 1]
@@ -1812,7 +1794,8 @@ class Main(Builder, BridgeSummary, PierInfo):
     
                 if damping == 'Rayleigh':
                     # Compute the Rayleigh damping
-                    Lambda = self._eigen(max(Modes))
+                    numEigen = int(max(Modes))
+                    Lambda = self._eigen(numEigen)
                     Omega = Lambda ** 0.5
                     wi = Omega[Modes[0] - 1]
                     wj = Omega[Modes[1] - 1]
