@@ -221,13 +221,8 @@ inputs = {
 #  ----------------------------------------------------------------------------
 # GMs = ['RSN1158_KOCAELI_DZC270.AT2', 'RSN1158_KOCAELI_DZC180.AT2', 'RSN1158_KOCAELI_DZC-UP.AT2']
 GMs = ['RSN1158_KOCAELI_DZC270.txt', 'RSN1158_KOCAELI_DZC180.txt', 'RSN1158_KOCAELI_DZC-UP.txt']
-GMcomponents = [1, 2]
-GMfactors = [1, 1]
-signal = '-accel'
-
-# GMs = ['RSN1158_KOCAELI_DZC270.AT2']
-# GMcomponents = [1]
-# GMfactors=[1.0]
+GMcomponents = [1, 2, 3]
+GMfactors = [1, 1, 1]
 
 #  ----------------------------------------------------------------------------
 #  INPUT for MSA (Multiple Stripes Analysis):
@@ -280,15 +275,15 @@ Bridge.plot_model(show_node='yes')
 Bridge.plot_sections()
 
 # Modal analysis
-# Bridge.modal(numEigen = 10)
+Bridge.modal(numEigen = 10)
 
 # Plot mode shapes
-# Bridge.plot_modeshape(1,200)
-# Bridge.plot_modeshape(2,200)
-# Bridge.plot_modeshape(3,200)
+Bridge.plot_modeshape(1,200)
+Bridge.plot_modeshape(2,200)
+Bridge.plot_modeshape(3,200)
 
 # Set some analysis configurations
-# Bridge.analysis_config('Penalty', 'RCM', 'UmfPack')
+Bridge.analysis_config('Penalty', 'RCM', 'UmfPack')
 
 # Gravity analysis
 Bridge.gravity(pflag=1, load_type=1)
@@ -310,8 +305,8 @@ Bridge.animation_config(animate=1, Movie=0, FrameStep=5, scale=10, fps=50)
 # ctrlNode = 2001, IOflag = 0, ctrlDOF = 2)
 
 # Nonlinear response history analysis
-# Bridge.nrha(excitation = 'Uniform' , signal = signal, GMs = GMs, GM_components=GMcomponents, GM_factors=GMfactors, DtFactor = 1.0, pFlag=1, GMdt = 0.005)
-Bridge.nrha(excitation = 'Multi-Support', signal = signal, GMs = GMs, GM_components=GMcomponents, GM_factors=GMfactors, DtFactor = 1.0, pFlag=1, GMdt = 0.005)
+Bridge.nrha(excitation = 'Uniform' , GMs = GMs, GM_components=GMcomponents, GM_factors=GMfactors, DtFactor = 1.0, pFlag=1, GMdt = 0.005, ScaleFactor = 9.81)
+# Bridge.nrha(excitation = 'Multi-Support', signal = '-accel', GMs = GMs, GM_components=GMcomponents, GM_factors=GMfactors, DtFactor = 1.0, pFlag=1, GMdt = 0.005, ScaleFactor = 9.81)
 
 # Multiple-stripe analysis
 # Bridge.msa(gm_msa, excitation = 'Multi-Support', signal = signal)

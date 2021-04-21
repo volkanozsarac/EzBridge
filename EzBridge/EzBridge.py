@@ -16,7 +16,6 @@ import pickle
 import numpy as np
 import openseespy.opensees as ops
 import pandas as pd
-from scipy.integrate import cumtrapz
 
 from . import Analysis
 from .Utility import program_info, create_outdir, distance, ReadRecord, def_units
@@ -979,12 +978,15 @@ class Main(Builder, BridgeSummary, PierInfo):
     def nrha(self, excitation='Uniform', signal = '-accel', GMs=None, GMangle=0, 
              GM_components=None, GM_factors=None, GMdt=None,
              pFlag=1, damping='Stiffness', Modes=1, xi=0.02, 
-             xi_modal=None, Dc=10, tFree=0, DtFactor=1):
+             xi_modal=None, Dc=10, tFree=0.0, DtFactor=1.0):
         """
         ----------------------------------------------
         Nonlinear Response History Analysis Parameters
         ----------------------------------------------
         excitation='Uniform'                Excitation type ('Uniform' or 'Multi-Support')
+        signal = '-accel'                   Type of time series (-accel, -vel, -disp) to apply. Then the input file must
+                                            be defined accordingly. Note that in case of Uniform excitation pattern
+                                            signal can only be acceleration.
         pFlag = 1                           Flag to print info during analyses (0,1,2,3)
         GMangle = 0                         Ground motion incidence angle, going to be applied on gm components 1 and 2
         damping = 'Rayleigh'                Specify the damping type to use ('Rayleigh','Stiffness','Mass','Modal')
@@ -997,9 +999,6 @@ class Main(Builder, BridgeSummary, PierInfo):
         tFree = 0.0                         Additional free vibration time
         DtFactor = 1.0		                Analysis time step is determined as a (DtFactor * GMdt). For example,
                                             if DtFactor = 1.0, analysis time step is equal to ground motion time step
-        signal = '-accel'                   Type of time series (-accel, -vel, -disp) to apply. The input file is always
-                                            acceleration time history. Direct integration is performed if velocity or 
-                                            displacement time history is applied.
 
         -----------------------------------------------
         Ground motion INPUT parameters
@@ -1088,20 +1087,18 @@ class Main(Builder, BridgeSummary, PierInfo):
 
             return gm_mat, GM_dur, GMdt
 
-        def Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag, SupportNode=None, SF = 9.81):
+        def Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag, SupportNode=None):
             # Define the Time Series and and the Load Pattern
             for i in range(1, 4):
+                # Setting time series
                 gm_i = gm_mat[i - 1, :]
-                    
+                ops.timeSeries('Path', tsTag, '-dt', GMdt, '-values', *list(gm_i), '-factor', 1.0)
+
                 # Creating UniformExcitation load pattern
                 if excitation == 'Uniform':
-                    # Setting time series to be passed to uniform excitation
-                    ops.timeSeries('Path', tsTag, '-dt', GMdt, '-values', *list(gm_i), '-factor', SF)
                     ops.pattern('UniformExcitation', pTag, i, '-accel', tsTag)
                 
                 elif excitation == 'Multi-Support':
-                    # Setting time series to be passed to uniform excitation
-                    ops.timeSeries('Path', tsTag, '-dt', GMdt, '-values', *list(gm_i), '-factor', SF)
                     # Creating MultipleSupport Excitation load pattern                        
                     ops.pattern('MultipleSupport', pTag)
                     ops.groundMotion(gmTag, 'Plain', signal,  tsTag)
@@ -1250,7 +1247,7 @@ class Main(Builder, BridgeSummary, PierInfo):
 
     def msa(self, gm_msa, damping='Stiffness', GMangle=0,
             Modes=1, xi=0.02, xi_modal=None, Dc=10, tFree=0, 
-            excitation='Uniform', signal = '-accel'):
+            excitation='Uniform', signal = '-accel', ScaleFactor = 1.0):
         """
         -----------------------------------------------
         -- Script to Conduct Multple-Stripe Analysis --
@@ -1276,9 +1273,9 @@ class Main(Builder, BridgeSummary, PierInfo):
                                             if pier reaches this drift level
         tFree = 0.0                         Additional free vibration time
         excitation = 'Uniform'              Excitation pattern applied ('Uniform','Multi-Support')
-        signal = '-accel'                   Type of time series (-accel, -vel, -disp) to apply. The input file is always
-                                            acceleration time history. Direct integration is performed if velocity or 
-                                            displacement time history is applied.        
+        signal = '-accel'                   Type of time series (-accel, -vel, -disp) to apply. Then the input file must
+                                            be defined accordingly. Note that in case of Uniform excitation pattern
+                                            signal can only be acceleration.
         -----------------------------------------------
         MSA input parameters (gm_msa, dictionary)
         -----------------------------------------------        
@@ -1290,7 +1287,6 @@ class Main(Builder, BridgeSummary, PierInfo):
         'gm_V_names_file':    "GMR_V_names.txt",       Names of ground motions to run (dir 3)
         'gm_multi_support':   "GMR_multi_support.txt"  GMR folder names for multi-support excitation case
          Excel File  MultiSupport_Excitation.xlsx containts the ground motion information for multi-support excitation case.
-        }
 
         Returns
         -------
@@ -1355,20 +1351,18 @@ class Main(Builder, BridgeSummary, PierInfo):
 
             return gm_mat, GM_dur, GMdt
 
-        def Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag, SupportNode=None, SF = 9.81):
+        def Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag, SupportNode=None):
             # Define the Time Series and and the Load Pattern
             for i in range(1, 4):
+                # Setting time series
                 gm_i = gm_mat[i - 1, :]
-                    
+                ops.timeSeries('Path', tsTag, '-dt', GMdt, '-values', *list(gm_i), '-factor', ScaleFactor)
+
                 # Creating UniformExcitation load pattern
                 if excitation == 'Uniform':
-                    # Setting time series to be passed to uniform excitation
-                    ops.timeSeries('Path', tsTag, '-dt', GMdt, '-values', *list(gm_i), '-factor', SF)
                     ops.pattern('UniformExcitation', pTag, i, '-accel', tsTag)
                 
                 elif excitation == 'Multi-Support':
-                    # Setting time series to be passed to uniform excitation
-                    ops.timeSeries('Path', tsTag, '-dt', GMdt, '-values', *list(gm_i), '-factor', SF)
                     # Creating MultipleSupport Excitation load pattern                        
                     ops.pattern('MultipleSupport', pTag)
                     ops.groundMotion(gmTag, 'Plain', signal,  tsTag)
@@ -1437,14 +1431,17 @@ class Main(Builder, BridgeSummary, PierInfo):
             
             # Initalize EDPs
             edp = {} # this the edp dictionary where the all related results will be saved
+
             # 1) Piers
             num_piers = self.num_bents * self.model['Bent']['N']
             # Initialise the array of IM levels
             edp['max_drift'] = np.zeros((num_gms, num_piers))  # Peak Column Drift Ratio
             edp['mu_curv'] = np.zeros((num_gms, num_piers))    # Peak Curvature Ductility
             edp['mu_disp'] = np.zeros((num_gms, num_piers))    # Peak Displacement Ductility
-            
+
             # 2) Abutments
+            edp['abut_disp'] = np.zeros((num_gms, 2))    # Peak Peak Displacement of Central Abutment Nodes
+
             # 3) Bearings
             # 4) Foundation etc..
 
@@ -1598,7 +1595,7 @@ class Main(Builder, BridgeSummary, PierInfo):
                         for SupportNode in self.fixed_AB2Nodes:   
                             tsTag, pTag, gmTag = Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag, SupportNode)
                         
-                    Mdrft, cIndex, mpier, mdrft, mudisp, muK, anlys = Analysis.nrha_multiple(self, DtAnalysis, tFinal, Dc, '', 0)
+                    Mdrft, cIndex, mpier, mdrft, mudisp, muK, anlys, abutdisps = Analysis.nrha_multiple(self, DtAnalysis, tFinal, Dc, '', 0)
                 time_text = RunTime(startT)
                 log.write(gm_text+'\n')
                 log.write(anlys+'\n')
@@ -1613,7 +1610,7 @@ class Main(Builder, BridgeSummary, PierInfo):
                 edp['max_drift'][iii,:] = mdrft
                 edp['mu_disp'][iii,:] = mudisp
                 edp['mu_curv'][iii,:] = muK
-            
+                edp['abut_disp'][iii,:] = abutdisps
             
             for error in error_log:      # add the error log
                 log.write('%s\n' % error)
@@ -1623,6 +1620,7 @@ class Main(Builder, BridgeSummary, PierInfo):
             np.savetxt(os.path.join(out_dir,'DriftRat.txt'),edp['max_drift'])
             np.savetxt(os.path.join(out_dir,'CurvDuct.txt'),edp['mu_curv'])
             np.savetxt(os.path.join(out_dir,'DispDuct.txt'),edp['mu_disp'])
+            np.savetxt(os.path.join(out_dir,'AbutDisp.txt'),edp['abut_disp'])
             with open(os.path.join(out_dir,'EDP.pkl'), 'wb') as handle:
                 pickle.dump(edp, handle, protocol=pickle.HIGHEST_PROTOCOL)
         if ops.getNP() == 1:

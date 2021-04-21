@@ -481,8 +481,15 @@ def get_pyParam_sand(pyDepth, gamma, phiDegree, b, pEleLength, puSwitch, kSwitch
 
     # y50 = 0.5 * (pu/A)/(k_SIunits * pyDepth) * np.arctanh(0.5)
     y50 = (pu)/(k_SIunits * pyDepth) * np.arctanh(0.5)
-    
-    return y50, pult
+    y = np.logspace(-4, 0, num=20)
+    P = pu*np.tanh(k_SIunits * pyDepth/(pu)*y)    
+
+    strain_stress = []
+    for i in range(len(y)):
+        strain_stress.append(y[i])
+        strain_stress.append(P[i])
+        
+    return y50, pult, np.array(strain_stress)
 
 
 def get_pyParam_clay(pyDepth, gamma, cu, eps50, b, pEleLength, clay = 'soft clay'):
@@ -496,8 +503,16 @@ def get_pyParam_clay(pyDepth, gamma, cu, eps50, b, pEleLength, clay = 'soft clay
     pu = min(pu1,pu2)
     y50 = 2.5*eps50*b
     pult = pu * pEleLength
+    y = np.logspace(-4, 0, num=20)
+    P = 0.5*pu*(y/y50)**(1/3)
+    P[P>pult] = pult
 
-    return y50, pult
+    strain_stress = []
+    for i in range(len(y)):
+        strain_stress.append(y[i])
+        strain_stress.append(P[i])
+
+    return y50, pult, np.array(strain_stress)
 
 ###########################################################
 #                                                         #
