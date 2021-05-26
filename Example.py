@@ -320,7 +320,7 @@ Bridge.get_summary()
 
 # Plot the model
 Bridge.plot_model(show_node='yes')
-# Bridge.plot_sections()
+Bridge.plot_sections()
 
 # Set some analysis configurations
 Bridge.analysis_config('Transformation', 'RCM', 'UmfPack')
@@ -332,9 +332,9 @@ Bridge.gravity(pflag=1, load_type=1)
 Bridge.modal(numEigen=10)
 
 # Plot mode shapes
-# Bridge.plot_modeshape(1,200)
-# Bridge.plot_modeshape(2,200)
-# Bridge.plot_modeshape(3,200)
+Bridge.plot_modeshape(1,200)
+Bridge.plot_modeshape(2,200)
+Bridge.plot_modeshape(3,200)
 
 # Plot deformed shape
 # Bridge.plot_deformedshape(scale = 50)
@@ -346,7 +346,7 @@ Bridge.modal(numEigen=10)
 # Bridge.set_recorders()
 
 # Animation option for nspa and nrha
-# Bridge.animation_config(animate=1, Movie=0, FrameStep=5, scale=10, fps=50)
+Bridge.animation_config(animate=1, Movie=0, FrameStep=5, scale=10, fps=50)
 
 # Pushover analysis
 # Bridge.nspa(scheme = 'Uniform', PushOption = 1, 
