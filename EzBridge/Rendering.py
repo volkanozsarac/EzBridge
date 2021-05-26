@@ -38,13 +38,13 @@ def plot_sec(obj):
         plt.show()
         # plt.savefig(filename,bbox_inches='tight')
 
-    if obj.model['Foundation']['Type'] in ['Pile-Shaft', 'Group Pile'] and obj.model['Foundation']['EleType'] in [1, 2]:
-        num_sec = len(set(obj.model['Foundation']['Sections']))
+    if obj.model['Bent_Foundation']['Type'] in ['Pile-Shaft', 'Group Pile'] and obj.model['Bent_Foundation']['EleType'] in [1, 2]:
+        num_sec = len(set(obj.model['Bent_Foundation']['Sections']))
         for i in range(num_sec):
-            D = obj.model['Foundation']['D'][i]  # Section diameter
-            cc = obj.model['Foundation']['cover'][i]  # Section diameter
-            numBars = obj.model['Foundation']['numBars'][i]  # Section diameter
-            dl = obj.model['Foundation']['dl'][i]  # Section diameter
+            D = obj.model['Bent_Foundation']['D'][i]  # Section diameter
+            cc = obj.model['Bent_Foundation']['cover'][i]  # Section diameter
+            numBars = obj.model['Bent_Foundation']['numBars'][i]  # Section diameter
+            dl = obj.model['Bent_Foundation']['dl'][i]  # Section diameter
             barArea = np.pi * dl ** 2 / 4
             secTag = str(i + 1)
             yC, zC, startAng, endAng, ri, ro, nfCoreR, nfCoreT, nfCoverR, nfCoverT = obj._circ_fiber_config(D)

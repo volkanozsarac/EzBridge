@@ -25,6 +25,7 @@ from . import Recorders
 from . import Rendering
 from .BridgeSummary import BridgeSummary, PierInfo
 
+
 class Main(Builder, BridgeSummary, PierInfo):
 
     def __init__(self, model, output_dir='Outputs'):
@@ -64,7 +65,7 @@ class Main(Builder, BridgeSummary, PierInfo):
         self.systemType = 'UmfPack'
         self.alphaS = 1e16
         self.alphaM = 1e16
-        
+
         global end_text
         # The following end_text is used for separation of some text outputs
         end_text = '-------------------------------------------------------------------------'
@@ -127,7 +128,7 @@ class Main(Builder, BridgeSummary, PierInfo):
         self.systemType = systemType
         self.alphaS = alphaS
         self.alphaM = alphaM
- 
+
     def set_recorders(self):
         """
         -------------------------------
@@ -183,13 +184,13 @@ class Main(Builder, BridgeSummary, PierInfo):
         --------------------------------
         """
         eleType_pier = self.model['Bent']['EleType']
-        AbutType = self.model['Abutment']['Type']
+        AbutType = self.model['Abutment_BackFill']['Type']
 
         self.model['Bent']['EleType'] = 0  # use elastic beam column elements
-        self.model['Abutment']['Type'] = 'Fixed'  # use fixed abutment to get axial loads
+        self.model['Abutment_BackFill']['Type'] = 'None'  # use fixed abutment to get axial loads
         self._build()  # build the model
         # F_total = self.gravity(pflag=0, load_type = 0)  # perform gravity analysis
-        F_total = self.gravity(pflag=0, load_type = 1)  # perform gravity analysis
+        F_total = self.gravity(pflag=0, load_type=1)  # perform gravity analysis
 
         self.BentAxialForces = []
         for eleList in self.EleIDsBent:
@@ -197,7 +198,7 @@ class Main(Builder, BridgeSummary, PierInfo):
             for eleTag in eleList:
                 Forces.append(ops.eleForce(eleTag, 3))
             self.BentAxialForces.append(Forces)
-        
+
         self.AB1AxialForces = 0
         for eleTag in self.EleIDsBearing[0]:
             self.AB1AxialForces += ops.eleForce(eleTag, 3)
@@ -207,7 +208,7 @@ class Main(Builder, BridgeSummary, PierInfo):
             self.AB2AxialForces += ops.eleForce(eleTag, 3)
 
         self.model['Bent']['EleType'] = eleType_pier  # return back to the actual inputs
-        self.model['Abutment']['Type'] = AbutType
+        self.model['Abutment_BackFill']['Type'] = AbutType
 
         self.M_total = F_total / 9.81  # total mass assigned to the structure
 
@@ -237,7 +238,7 @@ class Main(Builder, BridgeSummary, PierInfo):
         ops.system(self.systemType)
 
     @staticmethod
-    def _eigen(numEigen, pflag = 0):
+    def _eigen(numEigen, pflag=0):
         """
         --------------------------
         EIGENVALUE ANALYSIS
@@ -327,7 +328,8 @@ class Main(Builder, BridgeSummary, PierInfo):
                     ops.eleLoad('-ele', EleID, '-type', '-beamUniform', 0.0, 0.0, -self.EleLoadsBent[i])
 
         # APPLY BENTCAP LOADS
-        if self.model['Bearing']['N'] == 1 and self.num_piers == 1:
+        if all(num == 1 for num in self.model['Bearing']['N']) and self.num_piers == 1:
+
             for i in range(self.num_bents):
                 ops.load(self.BcapNodes[i][0], 0, 0, -self.PointLoadsBcap[i], 0, 0, 0)
         else:
@@ -337,7 +339,7 @@ class Main(Builder, BridgeSummary, PierInfo):
                 Coord2 = ops.nodeCoord(EleNodes[1])
                 Lele = distance(Coord1, Coord2)
                 Pload = Lele * self.EleLoadsBcap[i] / 2
-    
+
                 if load_type == 0:  # assign loads as point load
                     ops.load(EleNodes[0], 0, 0, -Pload, 0, 0, 0)
                     ops.load(EleNodes[1], 0, 0, -Pload, 0, 0, 0)
@@ -356,36 +358,41 @@ class Main(Builder, BridgeSummary, PierInfo):
                 ops.load(EleNodes[1], 0, 0, -Pload, 0, 0, 0)
             elif load_type == 1:  # assign loads as uniformly distributed load
                 ops.eleLoad('-ele', self.EleIDsLink[i], '-type', '-beamUniform', 0.0, -self.EleLoadsLink[i], 0.0)
-            
 
         # Apply the ele loads for piles
-        if self.model['Foundation']['Type'] == 'Pile-Shaft':
+        if self.model['Bent_Foundation']['Type'] == 'Pile-Shaft':
             for i in range(self.num_bents):
                 EleLoad = self.EleLoadsPile[i]
                 for ele in self.EleIDsPile[i]:
                     EleNodes = ops.eleNodes(ele)
-                    Coord1 = ops.nodeCoord(EleNodes[0]); Coord2 = ops.nodeCoord(EleNodes[1])
-                    Lele = ((Coord2[0]-Coord1[0])**2 + (Coord2[1]-Coord1[1])**2 + (Coord2[2]-Coord1[2])**2)**0.5
-                    Pload = Lele * EleLoad/2
+                    Coord1 = ops.nodeCoord(EleNodes[0]);
+                    Coord2 = ops.nodeCoord(EleNodes[1])
+                    Lele = ((Coord2[0] - Coord1[0]) ** 2 + (Coord2[1] - Coord1[1]) ** 2 + (
+                                Coord2[2] - Coord1[2]) ** 2) ** 0.5
+                    Pload = Lele * EleLoad / 2
                     if load_type == 0:  # assign loads as point load
-                        ops.load(EleNodes[0],0,0,-Pload,0,0,0); ops.load(EleNodes[1],0,0,-Pload,0,0,0)
-                    elif load_type == 1: # assign loads as uniformly distributed load
+                        ops.load(EleNodes[0], 0, 0, -Pload, 0, 0, 0);
+                        ops.load(EleNodes[1], 0, 0, -Pload, 0, 0, 0)
+                    elif load_type == 1:  # assign loads as uniformly distributed load
                         ops.eleLoad('-ele', ele, '-type', '-beamUniform', 0.0, 0.0, -EleLoad)
 
-        elif self.model['Foundation']['Type'] == 'Group Pile':
+        elif self.model['Bent_Foundation']['Type'] == 'Group Pile':
             for i in range(self.num_bents):
                 EleLoad = self.EleLoadsPile[i]
                 for ele in self.EleIDsPile[i]:
                     EleNodes = ops.eleNodes(ele)
-                    Coord1 = ops.nodeCoord(EleNodes[0]); Coord2 = ops.nodeCoord(EleNodes[1])
-                    Lele = ((Coord2[0]-Coord1[0])**2 + (Coord2[1]-Coord1[1])**2 + (Coord2[2]-Coord1[2])**2)**0.5
-                    Pload = Lele * EleLoad/2
+                    Coord1 = ops.nodeCoord(EleNodes[0]);
+                    Coord2 = ops.nodeCoord(EleNodes[1])
+                    Lele = ((Coord2[0] - Coord1[0]) ** 2 + (Coord2[1] - Coord1[1]) ** 2 + (
+                                Coord2[2] - Coord1[2]) ** 2) ** 0.5
+                    Pload = Lele * EleLoad / 2
                     if load_type == 0:  # assign loads as point load
-                        ops.load(EleNodes[0],0,0,-Pload,0,0,0); ops.load(EleNodes[1],0,0,-Pload,0,0,0)
-                    elif load_type == 1: # assign loads as uniformly distributed load
+                        ops.load(EleNodes[0], 0, 0, -Pload, 0, 0, 0);
+                        ops.load(EleNodes[1], 0, 0, -Pload, 0, 0, 0)
+                    elif load_type == 1:  # assign loads as uniformly distributed load
                         ops.eleLoad('-ele', ele, '-type', '-beamUniform', 0.0, 0.0, -EleLoad)
-                
-                ops.load(self.PcapNodes[i],0,0,-self.PcapWeight,0,0,0)
+
+                ops.load(self.PcapNodes[i], 0, 0, -self.PcapWeight, 0, 0, 0)
 
         # SET ANALYSIS PARAMETERS
         self._config()
@@ -426,7 +433,7 @@ class Main(Builder, BridgeSummary, PierInfo):
         text2 = []
         for i in range(self.num_bents):
             F_bent = np.zeros([1, 6])
-            if self.model['Foundation']['Type'] == 'Fixed':
+            if self.model['Bent_Foundation']['Type'] == 'Fixed':
                 for j in range(len(self.fixed_BentNodes[i])):
                     F_pier = np.zeros([1, 6])
                     node = self.fixed_BentNodes[i][j]
@@ -437,15 +444,15 @@ class Main(Builder, BridgeSummary, PierInfo):
                                   "{:.0f}".format(F_pier[0, 2]), "{:.0f}".format(F_pier[0, 3]),
                                   "{:.0f}".format(F_pier[0, 4]), "{:.0f}".format(F_pier[0, 5])))
                     F_bent = F_bent + F_pier
-                    
-            elif self.model['Foundation']['Type'] == 'Macro Elements':
+
+            elif self.model['Bent_Foundation']['Type'] == 'Springs':
                 node = self.fixed_BentNodes[i]
                 F_bent += np.array(ops.nodeReaction(node))
                 text2.append('%4s   | %6s | %6s | %6s | %6s | %6s | %6s |' %
                              ('B' + str(i + 1), "{:.0f}".format(F_bent[0, 0]),
                               "{:.0f}".format(F_bent[0, 1]),
                               "{:.0f}".format(F_bent[0, 2]), "{:.0f}".format(F_bent[0, 3]),
-                              "{:.0f}".format(F_bent[0, 4]), "{:.0f}".format(F_bent[0, 5])))       
+                              "{:.0f}".format(F_bent[0, 4]), "{:.0f}".format(F_bent[0, 5])))
 
             else:
                 for j in range(len(self.fixed_BentNodes[i])):
@@ -456,7 +463,7 @@ class Main(Builder, BridgeSummary, PierInfo):
                               "{:.0f}".format(F_bent[0, 1]),
                               "{:.0f}".format(F_bent[0, 2]), "{:.0f}".format(F_bent[0, 3]),
                               "{:.0f}".format(F_bent[0, 4]), "{:.0f}".format(F_bent[0, 5])))
-                    
+
             F_total += F_bent
 
         text2 = '\n'.join(text2)
@@ -471,7 +478,7 @@ class Main(Builder, BridgeSummary, PierInfo):
                                                                   "{:.0f}".format(F_Abut2[0, 3]),
                                                                   "{:.0f}".format(F_Abut2[0, 4]),
                                                                   "{:.0f}".format(F_Abut2[0, 5])))
-        
+
         F_total = F_total + F_Abut1 + F_Abut2
 
         text4 = ('%5s  | %6s | %6s | %6s | %6s | %6s | %6s |' % ('SUM',
@@ -495,7 +502,7 @@ class Main(Builder, BridgeSummary, PierInfo):
 
         return F_total[0, 2]  # total vertical reaction force --> total weight
 
-    def modal(self, numEigen=1, pflag = 1):
+    def modal(self, numEigen=1, pflag=1):
         """
         ----------------------------------------------------------------------------
         MODAL ANALYSIS
@@ -520,10 +527,10 @@ class Main(Builder, BridgeSummary, PierInfo):
         print("#########################################################################")
         print("                         Performing Modal Analysis...                    ")
         print("#########################################################################")
-        
+
         # compute the modal properties
         self._eigen(numEigen, pflag)
-        outname = os.path.join(self.out_dir,"Modal_Properties.out")
+        outname = os.path.join(self.out_dir, "Modal_Properties.out")
         args = ["-print", "-file", outname, "-unorm"]
         if pflag == 0:
             args.remove("-print")
@@ -571,7 +578,7 @@ class Main(Builder, BridgeSummary, PierInfo):
         """
         print("#########################################################################")
         print("                         Performing Modal Analysis...                    ")
-        print("#########################################################################")        
+        print("#########################################################################")
         ops.wipeAnalysis()
         ops.numberer("Plain")
         ops.system('FullGeneral')
@@ -716,7 +723,7 @@ class Main(Builder, BridgeSummary, PierInfo):
             print(arguments)
 
             # To the .csv file
-            outname = os.path.join(self.out_dir,"Modal_Properties.csv")
+            outname = os.path.join(self.out_dir, "Modal_Properties.csv")
             with open(outname, 'w', encoding='utf-32') as f:
                 f.write(arguments)
 
@@ -751,10 +758,10 @@ class Main(Builder, BridgeSummary, PierInfo):
             from response spectrum analysis is created.
 
         """
-        
+
         # Remove any existing analysis configuration
         ops.wipeAnalysis()
-        
+
         # CQC combination
         def CQC(mu, lambdas, dmp, scalf):
             u = 0.0
@@ -763,22 +770,22 @@ class Main(Builder, BridgeSummary, PierInfo):
                 for j in range(ne):
                     di = dmp[i]
                     dj = dmp[j]
-                    bij = lambdas[i]/lambdas[j]
-                    rho = ((8.0*np.sqrt(di*dj)*(di+bij*dj)*(bij**(3.0/2.0))) /
-                        ((1.0-bij**2.0)**2.0 + 4.0*di*dj*bij*(1.0+bij**2.0) + 
-                        4.0*(di**2.0 + dj**2.0)*bij**2.0))
-                    u += scalf[i]*mu[i] * scalf[j]*mu[j] * rho
+                    bij = lambdas[i] / lambdas[j]
+                    rho = ((8.0 * np.sqrt(di * dj) * (di + bij * dj) * (bij ** (3.0 / 2.0))) /
+                           ((1.0 - bij ** 2.0) ** 2.0 + 4.0 * di * dj * bij * (1.0 + bij ** 2.0) +
+                            4.0 * (di ** 2.0 + dj ** 2.0) * bij ** 2.0))
+                    u += scalf[i] * mu[i] * scalf[j] * mu[j] * rho
             return np.sqrt(u)
-        
+
         # Read target spectrum, first col: periods, second col: Sa
-        Periods = np.loadtxt(path_spec)[:,0]
-        Sa = np.loadtxt(path_spec)[:,1]
-        
+        Periods = np.loadtxt(path_spec)[:, 0]
+        Sa = np.loadtxt(path_spec)[:, 1]
+
         # Time series tag
         tsTag = 2
 
         # the response spectrum function
-        ops.timeSeries("Path",tsTag,"-time", *Periods,"-values", *Sa, "-factor",9.806)
+        ops.timeSeries("Path", tsTag, "-time", *Periods, "-values", *Sa, "-factor", 9.806)
 
         # set some analysis parameters, these depend on the model type that you use
         self._config()
@@ -795,9 +802,9 @@ class Main(Builder, BridgeSummary, PierInfo):
         ops.modalProperties("-unorm")
 
         # currently we use same damping for each mode
-        dmp = [damping]*len(eigs)
+        dmp = [damping] * len(eigs)
         # we don't want to scale some modes...
-        scalf = [1.0]*len(eigs)
+        scalf = [1.0] * len(eigs)
 
         # Maximum number of DOFs/node used in the system
         NDF = 6
@@ -806,12 +813,12 @@ class Main(Builder, BridgeSummary, PierInfo):
         EleForces = {}
 
         for ele in ops.getEleTags():
-            if str(ele)[-3:] != self.RigidTag: # Do not include rigid elements
-                EleForces[ele] = np.zeros((num_modes,2*NDF))
+            if str(ele)[-3:] != self.RigidTag:  # Do not include rigid elements
+                EleForces[ele] = np.zeros((num_modes, 2 * NDF))
 
         for mode in range(len(eigs)):
-            ops.responseSpectrum(tsTag, direction, '-mode', mode+1)
-            
+            ops.responseSpectrum(tsTag, direction, '-mode', mode + 1)
+
             # Element Forces
             for ele in EleForces.keys():
                 forces = ops.eleForce(ele)
@@ -822,7 +829,7 @@ class Main(Builder, BridgeSummary, PierInfo):
         for ele in EleForces.keys():
             forces = EleForces[ele]
             CQCForces[ele] = CQC(forces, eigs, dmp, scalf)
-        
+
         self.EleForces_RSA = CQCForces
 
     def nspa(self, ctrlNode, PushOption=1, scheme='Uniform', ctrlDOF=1,
@@ -975,9 +982,9 @@ class Main(Builder, BridgeSummary, PierInfo):
         if self.animate == 1:
             Rendering.animate_nspa(self, scheme, LoadFactor, DispCtrlNode, ctrlNode)
 
-    def nrha(self, excitation='Uniform', signal = '-accel', GMs=None, GMangle=0, 
+    def nrha(self, excitation='Uniform', signal='-accel', GMs=None, GMangle=0,
              GM_components=None, GM_factors=None, GMdt=None,
-             pFlag=1, damping='Stiffness', Modes=1, xi=0.02, 
+             pFlag=1, damping='Stiffness', Modes=1, xi=0.02,
              xi_modal=None, Dc=10, tFree=0.0, DtFactor=1.0):
         """
         ----------------------------------------------
@@ -1026,10 +1033,12 @@ class Main(Builder, BridgeSummary, PierInfo):
 
         def get_time_series(GM_components, GMs, GM_direct, GMdt):
             # Get gm components to use
-            nPts1 = 0; nPts2 = 0; nPtsV = 0
+            nPts1 = 0
+            nPts2 = 0
+            nPtsV = 0
             for i in range(len(GM_components)):
                 gm_path = os.path.join(GM_direct, GMs[i])  # Assuming GM is in PEER format
-                
+
                 if GM_components[i] == 1:
                     if gm_path[-4:] == '.AT2':
                         GMdt, _, _, _, gmH1_tmp = ReadRecord(gm_path)
@@ -1038,7 +1047,7 @@ class Main(Builder, BridgeSummary, PierInfo):
                     nPts1 = len(gmH1_tmp)
                     gmH1_fact = GM_factors[i]
                     gmH1_tmp = gmH1_tmp * gmH1_fact
-    
+
                 if GM_components[i] == 2:
                     if gm_path[-4:] == '.AT2':
                         GMdt, _, _, _, gmH2_tmp = ReadRecord(gm_path)
@@ -1047,7 +1056,7 @@ class Main(Builder, BridgeSummary, PierInfo):
                     nPts2 = len(gmH2_tmp)
                     gmH2_fact = GM_factors[i]
                     gmH2_tmp = gmH2_tmp * gmH2_fact
-    
+
                 if GM_components[i] == 3:
                     if gm_path[-4:] == '.AT2':
                         GMdt, _, _, _, gmV_tmp = ReadRecord(gm_path)
@@ -1058,24 +1067,24 @@ class Main(Builder, BridgeSummary, PierInfo):
                     gmV_tmp = gmV_tmp * gmV_fact
 
             # Assign zero if gm component is not used
-            nPts = max(nPts1,nPts2,nPtsV)
+            nPts = max(nPts1, nPts2, nPtsV)
             GM_dur = GMdt * nPts
             gmH1 = np.zeros(nPts)
-            gmH2 = np.zeros(nPts) 
+            gmH2 = np.zeros(nPts)
             gmV = np.zeros(nPts)
-            try: 
+            try:
                 gmH1[:nPts1] = gmH1_tmp
-            except: 
-                pass	
-            try: 
-                gmH2[:nPts2] = gmH2_tmp
-            except: 
-                pass	
-            try: 
-                gmV[:nPtsV] = gmV_tmp
-            except: 
+            except:
                 pass
-    
+            try:
+                gmH2[:nPts2] = gmH2_tmp
+            except:
+                pass
+            try:
+                gmV[:nPtsV] = gmV_tmp
+            except:
+                pass
+
             # Modify the ground motions according to the angle of incidence
             gmH1.shape = (1, nPts)
             gmH2.shape = (1, nPts)
@@ -1097,22 +1106,22 @@ class Main(Builder, BridgeSummary, PierInfo):
                 # Creating UniformExcitation load pattern
                 if excitation == 'Uniform':
                     ops.pattern('UniformExcitation', pTag, i, '-accel', tsTag)
-                
+
                 elif excitation == 'Multi-Support':
                     # Creating MultipleSupport Excitation load pattern                        
                     ops.pattern('MultipleSupport', pTag)
-                    ops.groundMotion(gmTag, 'Plain', signal,  tsTag)
+                    ops.groundMotion(gmTag, 'Plain', signal, tsTag)
                     ops.imposedMotion(SupportNode, i, gmTag)
-                    
+
                 tsTag += 1
                 pTag += 1
                 gmTag += 1
-                
+
             return tsTag, pTag, gmTag
 
         def create_th_dict(GM_components, GMdt, GM_direct):
             # Create time history dictionary for multi-support excitation case
-            excel_file = os.path.join(GM_direct,'MultiSupport_Excitation.xlsx')
+            excel_file = os.path.join(GM_direct, 'MultiSupport_Excitation.xlsx')
             xlsx = pd.ExcelFile(excel_file)
             th_dict = {}
             for sheet in xlsx.sheet_names:
@@ -1122,9 +1131,8 @@ class Main(Builder, BridgeSummary, PierInfo):
                     GMs = [data['H1'][k], data['H2'][k], data['V'][k]]
                     gm_mat, GM_dur, GMdt = get_time_series(GM_components, GMs, GM_direct, GMdt)
                     th_dict[sheet].append(gm_mat)
-                    
-            return th_dict, GM_dur, GMdt
 
+            return th_dict, GM_dur, GMdt
 
         print("#########################################################################")
         print("          Performing Nonlinear Response History Analysis (NRHA)...       ")
@@ -1183,52 +1191,91 @@ class Main(Builder, BridgeSummary, PierInfo):
         gmTag = 1
         GM_direct = os.path.join('GMfiles', 'NRHA')
 
-        if excitation == 'Uniform': # Uniform excitation case
+        if excitation == 'Uniform':  # Uniform excitation case
             if GMs is None:
                 print('Assign ground motion files to use: GMs')
-                sys.exit()      
+                sys.exit()
             gm_mat, GM_dur, GMdt = get_time_series(GM_components, GMs, GM_direct, GMdt)
             tsTag, pTag, gmTag = Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag)
-            
-        elif excitation == 'Multi-Support': # Multi-support excitation case
+
+        elif excitation == 'Multi-Support':  # Multi-support excitation case
             th_dict, GM_dur, GMdt = create_th_dict(GM_components, GMdt, GM_direct)
             # Apply excitation on bent nodes
-            for n in range(self.num_bents):                
-                if self.model['Foundation']['Type'] == 'Fixed':
-                    gm_mat = th_dict['Bent'+str(n+1)][0]
+            for n in range(self.num_bents):
+                if self.model['Bent_Foundation']['Type'] == 'Fixed':
+                    gm_mat = th_dict['Bent' + str(n + 1)][0]
                     for SupportNode in self.fixed_BentNodes[n]:
                         tsTag, pTag, gmTag = Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag, SupportNode)
-                        
-                elif self.model['Foundation']['Type'] == 'Macro Elements':
-                    gm_mat = th_dict['Bent'+str(n+1)][0]
+
+                elif self.model['Bent_Foundation']['Type'] == 'Springs':
+                    gm_mat = th_dict['Bent' + str(n + 1)][0]
                     SupportNode = self.fixed_BentNodes[n]
                     tsTag, pTag, gmTag = Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag, SupportNode)
-                    
-                elif self.model['Foundation']['Type'] == 'Pile-Shaft':
+
+                elif self.model['Bent_Foundation']['Type'] == 'Pile-Shaft':
                     count = 0
-                    for gm_mat in th_dict['Bent'+str(n+1)]:
+                    for gm_mat in th_dict['Bent' + str(n + 1)]:
                         for k in range((self.model['Bent']['N'])):
                             SupportNode = self.fixed_BentNodes[n][k][count]
                             tsTag, pTag, gmTag = Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag, SupportNode)
-                        count += 1                                        
+                        count += 1
 
-                elif self.model['Foundation']['Type'] == 'Group Pile':
+                elif self.model['Bent_Foundation']['Type'] == 'Group Pile':
                     count = 0
-                    for gm_mat in th_dict['Bent'+str(n+1)]:
+                    for gm_mat in th_dict['Bent' + str(n + 1)]:
                         for k in range(len(self.fixed_BentNodes[n])):
                             SupportNode = self.fixed_BentNodes[n][k][count]
                             tsTag, pTag, gmTag = Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag, SupportNode)
-                        count += 1      
-    
-            # Apply excitation on abutment1 nodes
-            gm_mat = th_dict['Abutment1'][0]
-            for SupportNode in self.fixed_AB1Nodes:   
-                tsTag, pTag, gmTag = Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag, SupportNode)
-    
-            # Apply excitation on abutment2 nodes
-            gm_mat = th_dict['Abutment2'][0]
-            for SupportNode in self.fixed_AB2Nodes:   
-                tsTag, pTag, gmTag = Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag, SupportNode)
+                        count += 1
+
+            if self.model['Abutment_BackFill']['Type'] == 'None' and \
+                    self.model['Abutment_Foundation']['Type'] == 'Fixed':
+                # Apply excitation on abutment1 nodes
+                gm_mat = th_dict['Abutment1'][0]
+                for SupportNode in self.fixed_AB1Nodes:
+                    tsTag, pTag, gmTag = Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag, SupportNode)
+
+                # Apply excitation on abutment2 nodes
+                gm_mat = th_dict['Abutment2'][0]
+                for SupportNode in self.fixed_AB2Nodes:
+                    tsTag, pTag, gmTag = Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag, SupportNode)
+
+            elif self.model['Abutment_BackFill']['Type'] != 'None':
+                # Apply excitation on abutment1 nodes
+                gm_mat = th_dict['Abutment1'][0]
+                for SupportNode in self.fixed_AB1Nodes_backfill:
+                    tsTag, pTag, gmTag = Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag, SupportNode)
+
+                # Apply excitation on abutment2 nodes
+                gm_mat = th_dict['Abutment2'][0]
+                for SupportNode in self.fixed_AB2Nodes_backfill:
+                    tsTag, pTag, gmTag = Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag, SupportNode)
+
+            if self.model['Abutment_Foundation']['Type'] == 'Springs':
+                # Apply excitation on abutment1 nodes
+                gm_mat = th_dict['Abutment1'][0]
+                for SupportNode in self.fixed_AB1Nodes_found:
+                    tsTag, pTag, gmTag = Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag, SupportNode)
+
+                # Apply excitation on abutment2 nodes
+                gm_mat = th_dict['Abutment2'][0]
+                for SupportNode in self.fixed_AB2Nodes_found:
+                    tsTag, pTag, gmTag = Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag, SupportNode)
+
+            elif self.model['Abutment_Foundation']['Type'] == 'Group Pile':
+                count = 0
+                for gm_mat in th_dict['Abutment1']:
+                    for k in range((len(self.fixed_AB1Nodes_found))):
+                        SupportNode = self.fixed_AB1Nodes_found[k][count]
+                        tsTag, pTag, gmTag = Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag, SupportNode)
+                    count += 1
+
+                count = 0
+                for gm_mat in th_dict['Abutment2']:
+                    for k in range((len(self.fixed_AB2Nodes_found))):
+                        SupportNode = self.fixed_AB2Nodes_found[k][count]
+                        tsTag, pTag, gmTag = Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag, SupportNode)
+                    count += 1
 
         tFinal = GM_dur + tFree  # Duration of analysis
         DtAnalysis = GMdt * DtFactor  # Default value is ground motion time step
@@ -1246,8 +1293,8 @@ class Main(Builder, BridgeSummary, PierInfo):
             Rendering.animate_nrha(self)
 
     def msa(self, gm_msa, damping='Stiffness', GMangle=0,
-            Modes=1, xi=0.02, xi_modal=None, Dc=10, tFree=0, 
-            excitation='Uniform', signal = '-accel', ScaleFactor = 1.0):
+            Modes=1, xi=0.02, xi_modal=None, Dc=10, tFree=0,
+            excitation='Uniform', signal='-accel', ScaleFactor=1.0):
         """
         -----------------------------------------------
         -- Script to Conduct Multple-Stripe Analysis --
@@ -1296,24 +1343,26 @@ class Main(Builder, BridgeSummary, PierInfo):
 
         def get_time_series(GM_components, GMs, GM_direct, GMdt):
             # Get gm components to use
-            nPts1 = 0; nPts2 = 0; nPtsV = 0
+            nPts1 = 0
+            nPts2 = 0
+            nPtsV = 0
             for i in range(len(GM_components)):
                 gm_path = os.path.join(GM_direct, GMs[i])  # Assuming GM is in PEER format
-                
+
                 if GM_components[i] == 1:
                     if gm_path[-4:] == '.AT2':
                         GMdt, _, _, _, gmH1_tmp = ReadRecord(gm_path)
                     else:
                         gmH1_tmp = np.loadtxt(gm_path)
                     nPts1 = len(gmH1_tmp)
-    
+
                 if GM_components[i] == 2:
                     if gm_path[-4:] == '.AT2':
                         GMdt, _, _, _, gmH2_tmp = ReadRecord(gm_path)
                     else:
                         gmH2_tmp = np.loadtxt(gm_path)
                     nPts2 = len(gmH2_tmp)
-    
+
                 if GM_components[i] == 3:
                     if gm_path[-4:] == '.AT2':
                         GMdt, _, _, _, gmV_tmp = ReadRecord(gm_path)
@@ -1322,24 +1371,24 @@ class Main(Builder, BridgeSummary, PierInfo):
                     nPtsV = len(gmV_tmp)
 
             # Assign zero if gm component is not used
-            nPts = max(nPts1,nPts2,nPtsV)
+            nPts = max(nPts1, nPts2, nPtsV)
             GM_dur = GMdt * nPts
             gmH1 = np.zeros(nPts)
-            gmH2 = np.zeros(nPts) 
+            gmH2 = np.zeros(nPts)
             gmV = np.zeros(nPts)
-            try: 
+            try:
                 gmH1[:nPts1] = gmH1_tmp
-            except: 
-                pass	
-            try: 
-                gmH2[:nPts2] = gmH2_tmp
-            except: 
-                pass	
-            try: 
-                gmV[:nPtsV] = gmV_tmp
-            except: 
+            except:
                 pass
-    
+            try:
+                gmH2[:nPts2] = gmH2_tmp
+            except:
+                pass
+            try:
+                gmV[:nPtsV] = gmV_tmp
+            except:
+                pass
+
             # Modify the ground motions according to the angle of incidence
             gmH1.shape = (1, nPts)
             gmH2.shape = (1, nPts)
@@ -1356,27 +1405,27 @@ class Main(Builder, BridgeSummary, PierInfo):
             for i in range(1, 4):
                 # Setting time series
                 gm_i = gm_mat[i - 1, :]
-                ops.timeSeries('Path', tsTag, '-dt', GMdt, '-values', *list(gm_i), '-factor', ScaleFactor)
+                ops.timeSeries('Path', tsTag, '-dt', GMdt, '-values', *gm_i.tolist(), '-factor', ScaleFactor)
 
                 # Creating UniformExcitation load pattern
                 if excitation == 'Uniform':
                     ops.pattern('UniformExcitation', pTag, i, '-accel', tsTag)
-                
+
                 elif excitation == 'Multi-Support':
                     # Creating MultipleSupport Excitation load pattern                        
                     ops.pattern('MultipleSupport', pTag)
-                    ops.groundMotion(gmTag, 'Plain', signal,  tsTag)
+                    ops.groundMotion(gmTag, 'Plain', signal, tsTag)
                     ops.imposedMotion(SupportNode, i, gmTag)
-                    
+
                 tsTag += 1
                 pTag += 1
                 gmTag += 1
-                
+
             return tsTag, pTag, gmTag
 
         def create_th_dict(GM_components, GMdt, GM_direct):
             # Create time history dictionary for multi-support excitation case
-            excel_file = os.path.join(GM_direct,'MultiSupport_Excitation.xlsx')
+            excel_file = os.path.join(GM_direct, 'MultiSupport_Excitation.xlsx')
             xlsx = pd.ExcelFile(excel_file)
             th_dict = {}
             for sheet in xlsx.sheet_names:
@@ -1386,118 +1435,120 @@ class Main(Builder, BridgeSummary, PierInfo):
                     GMs = [data['H1'][k], data['H2'][k], data['V'][k]]
                     gm_mat, GM_dur, GMdt = get_time_series(GM_components, GMs, GM_direct, GMdt)
                     th_dict[sheet].append(gm_mat)
-                    
+
             return th_dict, GM_dur, GMdt
 
-        gmMSA = os.path.join('GMfiles','MSA',gm_msa['Folder']) 
-        direc = os.path.join(self.out_dir,'MSA')
+        gmMSA = os.path.join('GMfiles', 'MSA', gm_msa['Folder'])
+        direc = os.path.join(self.out_dir, 'MSA')
         create_outdir(direc)
-    
+
         if ops.getNP() == 1:
             print("\
 #########################################################################\n\
           Performing Multiple Stripes Analysis (MSA)...              \n\
 #########################################################################")
         else:
-            self.analysis_config(self.constraintType, 
-                                 'Parallel'+self.numbererType, 'Mumps')
-            
+            self.analysis_config(self.constraintType,
+                                 'Parallel' + self.numbererType, 'Mumps')
+
         gm_sets = []
         for file in os.listdir(gmMSA):
             if not file.startswith('.'): gm_sets.append(file)
-        for gm_set in gm_sets: # loop for each ground motion set
-                
-            gm_dir = os.path.join(gmMSA,gm_set)
-            out_dir = os.path.join(direc,gm_set)
-            logfile_path = os.path.join(out_dir,'log.txt')
+        for gm_set in gm_sets:  # loop for each ground motion set
+
+            gm_dir = os.path.join(gmMSA, gm_set)
+            out_dir = os.path.join(direc, gm_set)
+            logfile_path = os.path.join(out_dir, 'log.txt')
             create_outdir(out_dir)
-            log = open(logfile_path,'w') # create a log file for each set
-            log.write(program_info())           
-          
+            log = open(logfile_path, 'w')  # create a log file for each set
+            log.write(program_info())
+
             # Try changing DtFactors if the analysis does not converge
             DtFactors = [1.0]
-            for i in range(3): 
-                DtFactors.append(DtFactors[-1]*0.5)
-            
-            dt_path = os.path.join(gm_dir,gm_msa['dts_file'])
+            for i in range(3):
+                DtFactors.append(DtFactors[-1] * 0.5)
+
+            dt_path = os.path.join(gm_dir, gm_msa['dts_file'])
             dts = np.loadtxt(dt_path)
             try:
-            	num_gms = len(dts)
-            except: # If a single record exists in gm set
-            	num_gms = 1
-            	dts = [float(dts)]
+                num_gms = len(dts)
+            except:  # If a single record exists in gm set
+                num_gms = 1
+                dts = [float(dts)]
             # Set up the error log to write to
             error_log = ["List of warning and errors encountered:"]
-            
+
             # Initalize EDPs
-            edp = {} # this the edp dictionary where the all related results will be saved
+            edp = {}  # this the edp dictionary where the all related results will be saved
 
             # 1) Piers
             num_piers = self.num_bents * self.model['Bent']['N']
             # Initialise the array of IM levels
             edp['max_drift'] = np.zeros((num_gms, num_piers))  # Peak Column Drift Ratio
-            edp['mu_curv'] = np.zeros((num_gms, num_piers))    # Peak Curvature Ductility
-            edp['mu_disp'] = np.zeros((num_gms, num_piers))    # Peak Displacement Ductility
+            edp['mu_curv'] = np.zeros((num_gms, num_piers))  # Peak Curvature Ductility
+            edp['mu_disp'] = np.zeros((num_gms, num_piers))  # Peak Displacement Ductility
 
             # 2) Abutments
-            edp['abut_disp'] = np.zeros((num_gms, 2))    # Peak Peak Displacement of Central Abutment Nodes
+            edp['abut_disp'] = np.zeros((num_gms, 2))  # Peak Peak Displacement of Central Abutment Nodes
 
             # 3) Bearings
             # 4) Foundation etc..
 
             # Open and load the ground motions
-            if excitation == 'Uniform': # Uniform Excitation Case
+            if excitation == 'Uniform':  # Uniform Excitation Case
                 GM_uniform = []
                 if 1 in gm_msa['MSAcomponents']:
-                    names_h1_path = os.path.join(gm_dir,gm_msa['gm_H1_names_file'])
+                    names_h1_path = os.path.join(gm_dir, gm_msa['gm_H1_names_file'])
                     with open(names_h1_path) as inputfile:
                         gm_h1_names = [line.rstrip() for line in inputfile]
                     GM_uniform.append(gm_h1_names)
                 if 2 in gm_msa['MSAcomponents']:
-                    names_h2_path = os.path.join(gm_dir,gm_msa['gm_H2_names_file'])
+                    names_h2_path = os.path.join(gm_dir, gm_msa['gm_H2_names_file'])
                     with open(names_h2_path) as inputfile:
                         gm_h2_names = [line.rstrip() for line in inputfile]
                     GM_uniform.append(gm_h2_names)
                 if 3 in gm_msa['MSAcomponents']:
-                    names_v_path = os.path.join(gm_dir,gm_msa['gm_V_names_file'])
+                    names_v_path = os.path.join(gm_dir, gm_msa['gm_V_names_file'])
                     with open(names_v_path) as inputfile:
                         gm_v_names = [line.rstrip() for line in inputfile]
                     GM_uniform.append(gm_v_names)
-                    
-            elif excitation == 'Multi-Support': # Multi-Support Excitation Case
-                folds_path = os.path.join(gm_dir,gm_msa['gm_multi_support'])
+
+            elif excitation == 'Multi-Support':  # Multi-Support Excitation Case
+                folds_path = os.path.join(gm_dir, gm_msa['gm_multi_support'])
                 with open(folds_path) as inputfile:
                     gm_multi_names = [line.rstrip() for line in inputfile]
-                    
+
             # Loop through each ground motion
             for iii in np.arange(num_gms):
                 # Get the ground motion
                 GMdt = dts[iii]
-                
+
                 if excitation == 'Uniform':
                     GMs = [gm_names[iii] for gm_names in GM_uniform]
                     gm_mat, GM_dur, GMdt = get_time_series(gm_msa['MSAcomponents'], GMs, gm_dir, GMdt)
-                    
+
                 elif excitation == 'Multi-Support':
-                    gm_dir2 = os.path.join(gm_dir,gm_multi_names[iii])
+                    gm_dir2 = os.path.join(gm_dir, gm_multi_names[iii])
                     th_dict, GM_dur, GMdt = create_th_dict(gm_msa['MSAcomponents'], GMdt, gm_dir2)
-                
+
                 tFinal = GM_dur + tFree  # Duration of analysis
-                gm_text = 'GM set: %s, GM no: %d' % (gm_set, iii+1)
-                
+                gm_text = 'GM set: %s, GM no: %d' % (gm_set, iii + 1)
+
                 if ops.getNP() == 1:
                     print('Running ' + gm_text + '...')
-                
-                cIndex = -1; cLoop = 0
+
+                cIndex = -1
+                cLoop = 0
                 # Lets try to reduce the time step if convergence is not satisfied, and re-run the analysis
-                while cIndex == -1 and cLoop<len(DtFactors): 
-                    if cLoop != 0: error_log.append('While running '+gm_text+' analysis failed to converge, reducing the analysis time step...')
+                while cIndex == -1 and cLoop < len(DtFactors):
+                    if cLoop != 0: error_log.append(
+                        'While running ' + gm_text + ' analysis failed to converge, reducing the analysis time step...')
                     DtAnalysis = GMdt * DtFactors[cLoop]
                     cLoop += 1
                     #  ----------------------------------------------------------------------------
                     #  Gravity Analysis
                     #  ----------------------------------------------------------------------------
-                    startT= Get_T0()
+                    startT = Get_T0()
                     self.wipe_model()
                     self._build()
                     self.gravity(pflag=0)
@@ -1507,13 +1558,13 @@ class Main(Builder, BridgeSummary, PierInfo):
                     if damping == 'Modal':
                         self._eigen(len(xi_modal))
                         ops.modalDamping(*xi_modal)
-            
+
                     else:
                         Mass_flag = 1
                         K_comm_flag = 1
                         K_init_flag = 0
                         K_curr_flag = 0
-            
+
                         if damping == 'Rayleigh':
                             # Compute the Rayleigh damping
                             numEigen = int(max(Modes))
@@ -1523,32 +1574,32 @@ class Main(Builder, BridgeSummary, PierInfo):
                             wj = Omega[Modes[1] - 1]
                             a0 = 2.0 * xi * wi * wj / (wi + wj)
                             a1 = 2.0 * xi / (wi + wj)
-            
+
                         elif damping == 'Stiffness':
                             Mass_flag = 0
                             Lambda = self._eigen(Modes)
                             Omega = Lambda ** 0.5
                             a0 = 0
                             a1 = 2.0 * xi / Omega[Modes - 1]
-            
+
                         elif damping == 'Mass':
                             K_comm_flag = 0
                             Lambda = self._eigen(Modes)
                             Omega = Lambda ** 0.5
                             a0 = 2.0 * xi / Omega[Modes - 1]
                             a1 = 0
-            
+
                         alphaM = a0 * Mass_flag  # Mass-proportional damping coefficient
                         betaK_curr = a1 * K_curr_flag  # tangent-stiffness proportional damping
                         betaK_init = a1 * K_init_flag  # initial-stiffness proportional damping
                         betaK_comm = a1 * K_comm_flag  # Last committed-stiffness proportional damping
                         ops.rayleigh(alphaM, betaK_curr, betaK_init, betaK_comm)
-                        
+
                     #  ----------------------------------------------------------------------------
                     #  Nonlinear Response History Analysis
                     #  ----------------------------------------------------------------------------  
-                    self._config() # Configure the analysis parameters
-                    
+                    self._config()  # Configure the analysis parameters
+
                     # Define the Time Series and and the Load Pattern
                     tsTag = 2
                     pTag = 2
@@ -1556,82 +1607,132 @@ class Main(Builder, BridgeSummary, PierInfo):
                     if excitation == 'Uniform':
                         tsTag, pTag, gmTag = Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag)
 
-                    elif excitation == 'Multi-Support': # Multi-support excitation case
+                    elif excitation == 'Multi-Support':  # Multi-support excitation case
                         # Apply excitation on bent nodes
-                        for n in range(self.num_bents):                
-                            if self.model['Foundation']['Type'] == 'Fixed':
-                                gm_mat = th_dict['Bent'+str(n+1)][0]
+                        for n in range(self.num_bents):
+                            if self.model['Bent_Foundation']['Type'] == 'Fixed':
+                                gm_mat = th_dict['Bent' + str(n + 1)][0]
                                 for SupportNode in self.fixed_BentNodes[n]:
-                                    tsTag, pTag, gmTag = Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag, SupportNode)
-                                    
-                            elif self.model['Foundation']['Type'] == 'Macro Elements':
-                                gm_mat = th_dict['Bent'+str(n+1)][0]
+                                    tsTag, pTag, gmTag = Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag,
+                                                                             SupportNode)
+
+                            elif self.model['Bent_Foundation']['Type'] == 'Springs':
+                                gm_mat = th_dict['Bent' + str(n + 1)][0]
                                 SupportNode = self.fixed_BentNodes[n]
                                 tsTag, pTag, gmTag = Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag, SupportNode)
-                                
-                            elif self.model['Foundation']['Type'] == 'Pile-Shaft':
+
+                            elif self.model['Bent_Foundation']['Type'] == 'Pile-Shaft':
                                 count = 0
-                                for gm_mat in th_dict['Bent'+str(n+1)]:
+                                for gm_mat in th_dict['Bent' + str(n + 1)]:
                                     for k in range((self.model['Bent']['N'])):
                                         SupportNode = self.fixed_BentNodes[n][k][count]
-                                        tsTag, pTag, gmTag = Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag, SupportNode)
-                                    count += 1                                        
-            
-                            elif self.model['Foundation']['Type'] == 'Group Pile':
+                                        tsTag, pTag, gmTag = Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag,
+                                                                                 SupportNode)
+                                    count += 1
+
+                            elif self.model['Bent_Foundation']['Type'] == 'Group Pile':
                                 count = 0
-                                for gm_mat in th_dict['Bent'+str(n+1)]:
+                                for gm_mat in th_dict['Bent' + str(n + 1)]:
                                     for k in range(len(self.fixed_BentNodes[n])):
                                         SupportNode = self.fixed_BentNodes[n][k][count]
-                                        tsTag, pTag, gmTag = Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag, SupportNode)
-                                    count += 1      
-                
-                        # Apply excitation on abutment1 nodes
-                        gm_mat = th_dict['Abutment1'][0]
-                        for SupportNode in self.fixed_AB1Nodes:   
-                            tsTag, pTag, gmTag = Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag, SupportNode)
-                
-                        # Apply excitation on abutment2 nodes
-                        gm_mat = th_dict['Abutment2'][0]
-                        for SupportNode in self.fixed_AB2Nodes:   
-                            tsTag, pTag, gmTag = Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag, SupportNode)
-                        
-                    Mdrft, cIndex, mpier, mdrft, mudisp, muK, anlys, abutdisps = Analysis.nrha_multiple(self, DtAnalysis, tFinal, Dc, '', 0)
+                                        tsTag, pTag, gmTag = Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag,
+                                                                                 SupportNode)
+                                    count += 1
+
+                        if self.model['Abutment_BackFill']['Type'] == 'None' and \
+                                self.model['Abutment_Foundation']['Type'] == 'Fixed':
+                            # Apply excitation on abutment1 nodes
+                            gm_mat = th_dict['Abutment1'][0]
+                            for SupportNode in self.fixed_AB1Nodes:
+                                tsTag, pTag, gmTag = Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag,
+                                                                         SupportNode)
+
+                            # Apply excitation on abutment2 nodes
+                            gm_mat = th_dict['Abutment2'][0]
+                            for SupportNode in self.fixed_AB2Nodes:
+                                tsTag, pTag, gmTag = Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag,
+                                                                         SupportNode)
+
+                        elif self.model['Abutment_BackFill']['Type'] != 'None':
+                            # Apply excitation on abutment1 nodes
+                            gm_mat = th_dict['Abutment1'][0]
+                            for SupportNode in self.fixed_AB1Nodes_backfill:
+                                tsTag, pTag, gmTag = Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag,
+                                                                         SupportNode)
+
+                            # Apply excitation on abutment2 nodes
+                            gm_mat = th_dict['Abutment2'][0]
+                            for SupportNode in self.fixed_AB2Nodes_backfill:
+                                tsTag, pTag, gmTag = Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag,
+                                                                         SupportNode)
+
+                        if self.model['Abutment_Foundation']['Type'] == 'Springs':
+                            # Apply excitation on abutment1 nodes
+                            gm_mat = th_dict['Abutment1'][0]
+                            for SupportNode in self.fixed_AB1Nodes_found:
+                                tsTag, pTag, gmTag = Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag,
+                                                                         SupportNode)
+
+                            # Apply excitation on abutment2 nodes
+                            gm_mat = th_dict['Abutment2'][0]
+                            for SupportNode in self.fixed_AB2Nodes_found:
+                                tsTag, pTag, gmTag = Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag,
+                                                                         SupportNode)
+
+                        elif self.model['Abutment_Foundation']['Type'] == 'Group Pile':
+                            count = 0
+                            for gm_mat in th_dict['Abutment1']:
+                                for k in range((len(self.fixed_AB1Nodes_found))):
+                                    SupportNode = self.fixed_AB1Nodes_found[k][count]
+                                    tsTag, pTag, gmTag = Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag,
+                                                                             gmTag, SupportNode)
+                                count += 1
+
+                            count = 0
+                            for gm_mat in th_dict['Abutment2']:
+                                for k in range((len(self.fixed_AB2Nodes_found))):
+                                    SupportNode = self.fixed_AB2Nodes_found[k][count]
+                                    tsTag, pTag, gmTag = Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag,
+                                                                             gmTag, SupportNode)
+                                count += 1
+
+                    Mdrft, cIndex, mpier, mdrft, mudisp, muK, anlys, abutdisps = \
+                        Analysis.nrha_multiple(self, DtAnalysis, tFinal, Dc, '',  0)
                 time_text = RunTime(startT)
-                log.write(gm_text+'\n')
-                log.write(anlys+'\n')
-                log.write(time_text+'\n')
-                log.write(end_text+"\n")
-            
+                log.write(gm_text + '\n')
+                log.write(anlys + '\n')
+                log.write(time_text + '\n')
+                log.write(end_text + "\n")
+
                 if ops.getNP() == 1:
                     print(time_text)
                     print(end_text)
-                
+
                 # Save edp values
-                edp['max_drift'][iii,:] = mdrft
-                edp['mu_disp'][iii,:] = mudisp
-                edp['mu_curv'][iii,:] = muK
-                edp['abut_disp'][iii,:] = abutdisps
-            
-            for error in error_log:      # add the error log
+                edp['max_drift'][iii, :] = mdrft
+                edp['mu_disp'][iii, :] = mudisp
+                edp['mu_curv'][iii, :] = muK
+                edp['abut_disp'][iii, :] = abutdisps
+
+            for error in error_log:  # add the error log
                 log.write('%s\n' % error)
             log.close()
-            
+
             # Save the results
-            np.savetxt(os.path.join(out_dir,'DriftRat.txt'),edp['max_drift'])
-            np.savetxt(os.path.join(out_dir,'CurvDuct.txt'),edp['mu_curv'])
-            np.savetxt(os.path.join(out_dir,'DispDuct.txt'),edp['mu_disp'])
-            np.savetxt(os.path.join(out_dir,'AbutDisp.txt'),edp['abut_disp'])
-            with open(os.path.join(out_dir,'EDP.pkl'), 'wb') as handle:
+            np.savetxt(os.path.join(out_dir, 'DriftRat.txt'), edp['max_drift'])
+            np.savetxt(os.path.join(out_dir, 'CurvDuct.txt'), edp['mu_curv'])
+            np.savetxt(os.path.join(out_dir, 'DispDuct.txt'), edp['mu_disp'])
+            np.savetxt(os.path.join(out_dir, 'AbutDisp.txt'), edp['abut_disp'])
+            with open(os.path.join(out_dir, 'EDP.pkl'), 'wb') as handle:
                 pickle.dump(edp, handle, protocol=pickle.HIGHEST_PROTOCOL)
         if ops.getNP() == 1:
             print("\
 #########################################################################\n\
                 Multiple Stripes Analysis (MSA) is Completed!            \n\
-#########################################################################") 
+#########################################################################")
 
-
-    def ida_htf(self, htf, gm_ida, im, gmFol, IDAdir, damping='Stiffness',  
-                Modes=1, xi=0.02, xi_modal=None, Dc=10, tFree=0, DtFactor=1):
+    def ida_htf(self, htf, gm_ida, im, gmFol, IDAdir, damping='Stiffness',
+                Modes=1, xi=0.02, xi_modal=None, Dc=10, DtFactor=1):
         """
         TODO: Currently, this option is implemented only for uni-directional analysis. Moreover, 
         there is no option for multiple-support excitation, hence only available option is to use
@@ -1667,30 +1768,30 @@ class Main(Builder, BridgeSummary, PierInfo):
         More intensity measures can be included. In the current version there is only PGA and SA(T)
         
         Some of the warning outputs:
-         	"----- WARNING: Collapsed achieved on first increment, reduce increment..."
-         	This means that the first step following the initial elastic run resuted in a collapse. In
-         	short, you have well over-shot the runway with the increment step. This is the second run,
-         	but if the building is collapsing on the very first run (i.e. the user defined intensity),
-         	well it seems you have bigger problems.
+            "----- WARNING: Collapsed achieved on first increment, reduce increment..."
+            This means that the first step following the initial elastic run resuted in a collapse. In
+            short, you have well over-shot the runway with the increment step. This is the second run,
+            but if the building is collapsing on the very first run (i.e. the user defined intensity),
+            well it seems you have bigger problems.
         
-         	"--- WARNING: First trace for collapse resulted in collapse..."
-         	Once the collapse has been hunted out, we go back to tracing the collapse more carefully.
-         	If this first trace results in collapse, either the last non-collapsing run was quite close
-         	to the collapsing intensity or the
-         	fraction of the difference is too big. Ideally, we would like to reduce this fraction
-         	automatically, but it's a bitch to code at the minute. Flagged for follow-up.....
+            "--- WARNING: First trace for collapse resulted in collapse..."
+            Once the collapse has been hunted out, we go back to tracing the collapse more carefully.
+            If this first trace results in collapse, either the last non-collapsing run was quite close
+            to the collapsing intensity or the
+            fraction of the difference is too big. Ideally, we would like to reduce this fraction
+            automatically, but it's a bitch to code at the minute. Flagged for follow-up.....
         
-         	"----- WARNING: Collapse not achieved, increase increment or number of runs..."
-         	This means the collapse hasn't been hunted out yet, so either the incrementing to reach
-         	collapse is increased	or the maximum nuber of runs at the current increment is increased
-         	to allow it to go further. This warning	could be used as a way of gauging when collapse
-         	occurs, such that the max runs can be specified a priori such that there are enough runs left
-         	for tracing and filling.
+            "----- WARNING: Collapse not achieved, increase increment or number of runs..."
+            This means the collapse hasn't been hunted out yet, so either the incrementing to reach
+            collapse is increased	or the maximum nuber of runs at the current increment is increased
+            to allow it to go further. This warning	could be used as a way of gauging when collapse
+            occurs, such that the max runs can be specified a priori such that there are enough runs left
+            for tracing and filling.
         
-         	"----- WARNING: No filling, algorithm still tracing for collapse (reduce increment & increase runs)..."
-         	The algorithm is still tracing for collapse, either because there are not enough runs or
-         	because the increment used during the hunting was too big with respect to the fraction of
-         	the difference being used to trace.
+            "----- WARNING: No filling, algorithm still tracing for collapse (reduce increment & increase runs)..."
+            The algorithm is still tracing for collapse, either because there are not enough runs or
+            because the increment used during the hunting was too big with respect to the fraction of
+            the difference being used to trace.
 
         IDA can be carried out using single gm component in one of the global axes, 
         the analysis direction is set by the user (IDAdir)
@@ -1735,10 +1836,10 @@ class Main(Builder, BridgeSummary, PierInfo):
         
 
         """
-    
+
         # set the ground motion records to be used for each processor
-        gmIDA = os.path.join('GMfiles',gmFol) 
-        
+        gmIDA = os.path.join('GMfiles', gmFol)
+
         # Set the top and bottom nodes for piers to calculate peak interstorey drift ratio
         PierStartNodes = []
         PierEndNodes = []
@@ -1747,49 +1848,48 @@ class Main(Builder, BridgeSummary, PierInfo):
                 PierEndNodes.append(node)
             for node in self.BentStartNodes[i]:
                 PierStartNodes.append(node)
-        
-        direc = os.path.join(self.out_dir,'IDA')
+
+        direc = os.path.join(self.out_dir, 'IDA')
         create_outdir(direc)
-    
+
         pid = ops.getPID()
-        logfile_path = os.path.join(direc, str(pid)+'_log.txt')
-        log = open(logfile_path,'w')
+        logfile_path = os.path.join(direc, str(pid) + '_log.txt')
+        log = open(logfile_path, 'w')
         txtstr = program_info()
         log.write(txtstr)
-        
+
         if ops.getNP() == 1:
             print("\
 #########################################################################\n\
               Performing Incremental Dynamic Analysis (IDA)...           \n\
 #########################################################################")
         else:
-            self.analysis_config(self.constraintType, 
-                                 'Parallel'+self.numbererType, 'Mumps')
+            self.analysis_config(self.constraintType,
+                                 'Parallel' + self.numbererType, 'Mumps')
             log.write("This is processor %s\nPerforming Incremental Dynamic Analysis (IDA)...\n" % str(pid))
-            
-        
+
         def analyze(gm, IDAdir):
             #  ----------------------------------------------------------------------------
             #  Gravity Analysis
             #  ----------------------------------------------------------------------------
-            startT= Get_T0()
+            startT = Get_T0()
             self.wipe_model()
             self._build()
             self.gravity(pflag=0)
-    
+
             #  ----------------------------------------------------------------------------
             #  Eigenvalue Analysis - Damping Definition
             #  ----------------------------------------------------------------------------
             if damping == 'Modal':
                 self._eigen(len(xi_modal))
                 ops.modalDamping(*xi_modal)
-    
+
             else:
                 Mass_flag = 1
                 K_comm_flag = 1
                 K_init_flag = 0
                 K_curr_flag = 0
-    
+
                 if damping == 'Rayleigh':
                     # Compute the Rayleigh damping
                     numEigen = int(max(Modes))
@@ -1799,103 +1899,103 @@ class Main(Builder, BridgeSummary, PierInfo):
                     wj = Omega[Modes[1] - 1]
                     a0 = 2.0 * xi * wi * wj / (wi + wj)
                     a1 = 2.0 * xi / (wi + wj)
-    
+
                 elif damping == 'Stiffness':
                     Mass_flag = 0
                     Lambda = self._eigen(Modes)
                     Omega = Lambda ** 0.5
                     a0 = 0
                     a1 = 2.0 * xi / Omega[Modes - 1]
-    
+
                 elif damping == 'Mass':
                     K_comm_flag = 0
                     Lambda = self._eigen(Modes)
                     Omega = Lambda ** 0.5
                     a0 = 2.0 * xi / Omega[Modes - 1]
                     a1 = 0
-    
+
                 alphaM = a0 * Mass_flag  # Mass-proportional damping coefficient
                 betaK_curr = a1 * K_curr_flag  # tangent-stiffness proportional damping
                 betaK_init = a1 * K_init_flag  # initial-stiffness proportional damping
                 betaK_comm = a1 * K_comm_flag  # Last committed-stiffness proportional damping
                 ops.rayleigh(alphaM, betaK_curr, betaK_init, betaK_comm)
-    
+
             #  ----------------------------------------------------------------------------
             #  Nonlinear Response History Analysis
             #  ----------------------------------------------------------------------------  
             self._config()
-            
+
             # Define the Time Series and and the Load Pattern
             tsTag = 2
             pTag = 2
             g = 9.81
             dt = gm['dt']
             tFinal = gm['dur']
-            GMfatt = gm['sf']*g
+            GMfatt = gm['sf'] * g
             record = gm['file_name']
             ops.timeSeries('Path', tsTag, '-dt', dt, '-filePath', record, '-factor', GMfatt)
             ops.pattern('UniformExcitation', pTag, IDAdir, '-accel', tsTag)
-            
+
             # !!! right now EDP is pier drift
             tNode = PierStartNodes
             bNode = PierEndNodes
             # Run analysis
-            DtAnalysis = dt*DtFactor
+            DtAnalysis = dt * DtFactor
             mdrft, cIndex, mpier, anlys = Analysis.nrha_single(self, DtAnalysis, tFinal, Dc, tNode, bNode, '', 0)
-            
+
             self.wipe_model()
-            
+
             time_text = RunTime(startT)
-            log.write(anlys+'\n')
-            log.write(time_text+'\n')
-            log.write(end_text+'\n')
-            
+            log.write(anlys + '\n')
+            log.write(time_text + '\n')
+            log.write(end_text + '\n')
+
             if ops.getNP() == 1:
                 print(time_text)
                 print(end_text)
             pass
-        
+
             return mdrft, cIndex
-    
+
         DtFactor_init = DtFactor
         iml_hunt_incr_init = htf['iml_hunt_incr']
         iml_trace_incr_init = htf['iml_trace_incr']
-        fc_flag = 0 # if this is 1, it means that structure collapsed while filling
+        fc_flag = 0  # if this is 1, it means that structure collapsed while filling
         temp_factor = 1
-        
-        names_path = os.path.join(gmIDA,gm_ida['gm_names_file'])
-        dt_path = os.path.join(gmIDA,gm_ida['dts_file'])
-        durs_path = os.path.join(gmIDA,gm_ida['durs_file'])
-        
+
+        names_path = os.path.join(gmIDA, gm_ida['gm_names_file'])
+        dt_path = os.path.join(gmIDA, gm_ida['dts_file'])
+        durs_path = os.path.join(gmIDA, gm_ida['durs_file'])
+
         # Open and load the ground motions
         with open(names_path) as inputfile:
             gm_names = [line.rstrip() for line in inputfile]
-        
+
         dts = np.loadtxt(dt_path)
         durs = np.loadtxt(durs_path)
         try:
-        	num_gms = len(dts)
-        except: # IDA for set with single record
-        	num_gms = 1
-        	dts = [float(dts)]
-        	durs = [float(durs)]
-        
+            num_gms = len(dts)
+        except:  # IDA for set with single record
+            num_gms = 1
+            dts = [float(dts)]
+            durs = [float(durs)]
+
         # Set up the error log to write to
         error_log = ["List of warning and errors encountered:"]
-        
+
         # Initialise the array of IM levels
         iml = np.zeros((num_gms, htf['num_runs'] + 1))
         d_max = np.zeros((num_gms, htf['num_runs'] + 1))
-        
+
         iml_sorted = np.zeros((num_gms, htf['num_runs'] + 1))
         d_max_sorted = np.zeros((num_gms, htf['num_runs'] + 1))
-        
+
         # Loop through each ground motion
         for iii in np.arange(num_gms):
             # Get the ground motion
-            
+
             gm = {
-                'file_name': os.path.join(gmIDA,gm_names[iii]),
+                'file_name': os.path.join(gmIDA, gm_names[iii]),
                 'dt': dts[iii],
                 'dur': durs[iii],
                 'sf': 0.0,
@@ -1905,183 +2005,187 @@ class Main(Builder, BridgeSummary, PierInfo):
             if im['im'] == 'pga':
                 iml_curr_gm = np.max(np.abs(np.loadtxt(gm['file_name'])))
             elif im['im'] == 'SaT':
-                _,_,_,ac_tot = sdof_ltha(np.loadtxt(gm['file_name']), dts[iii], np.array([im['Tstar']]), im['xi'], 1)
-                iml_curr_gm = np.max(np.abs((ac_tot)),axis = 0)[0]
+                _, _, _, ac_tot = sdof_ltha(np.loadtxt(gm['file_name']), dts[iii], np.array([im['Tstar']]), im['xi'], 1)
+                iml_curr_gm = np.max(np.abs((ac_tot)), axis=0)[0]
             else:
-                print("Cannot find the intensity measure: "+im['im'])
+                print("Cannot find the intensity measure: " + im['im'])
                 sys.exit()
-        
+
             # Set up some parameters
-            jjj = 1       # Initialise the list of IM used for printing
-            hFlag = 1     # Hunting flag (1 for when we're hunting)
-            tFlag = 0     # Tracing flag (0 at first)
-            fFlag = 0     # Filling flag (0 at first)
-            coll_index = 0 # Set the collapse index up initially
-        
+            jjj = 1  # Initialise the list of IM used for printing
+            hFlag = 1  # Hunting flag (1 for when we're hunting)
+            tFlag = 0  # Tracing flag (0 at first)
+            fFlag = 0  # Filling flag (0 at first)
+            coll_index = 0  # Set the collapse index up initially
+
             # Start the process
             while jjj <= htf['num_runs']:
-                
+
                 # Use this gm and sf to analyse the structure
-                run = 'Record_'+str(iii+1)+'_Run_'+str(jjj+1)
-        
+                run = 'Record_' + str(iii + 1) + '_Run_' + str(jjj + 1)
+
                 ######### Hunting part            
                 if hFlag == 1:
-                    gm_text = "Hunting... GM: " + str(iii+1) + "   Run: " + str(jjj)
+                    gm_text = "Hunting... GM: " + str(iii + 1) + "   Run: " + str(jjj)
                     if ops.getNP() == 1: print(gm_text)
-                    log.write(gm_text+"\n")
-        
+                    log.write(gm_text + "\n")
+
                     if jjj == 1:
                         # We are running the first run so use im_init
                         iml[iii][jjj] = htf['iml_init']
                     elif jjj > 1:
                         # Now start to ramp it up!
-                        iml[iii][jjj] = iml[iii][jjj-1]+(jjj-1)*htf['iml_hunt_incr']
-        
+                        iml[iii][jjj] = iml[iii][jjj - 1] + (jjj - 1) * htf['iml_hunt_incr']
+
                     # Determine the scale factor to be applied to the current gm to reach the iml required
-                    gm['sf'] = iml[iii][jjj]/iml_curr_gm
-        
+                    gm['sf'] = iml[iii][jjj] / iml_curr_gm
+
                     # Build and run the OpenSees model
                     mdrft, cIndex = analyze(gm, IDAdir)
                     d_max[iii][jjj] = mdrft
                     coll_index = cIndex
-                    
+
                     # If we get a collapse
                     if coll_index == 1:
-                        DtFactor = DtFactor_init # reset DtFactor to initial choice
-                        htf['iml_hunt_incr'] = iml_hunt_incr_init # reset iml_hunt_incr to initial choice
-        
-                        hFlag = 0       # Hunting flag (Stop hunting)
-                        tFlag = 1       # Tracing flag (Now we are tracing)
-                        j_hunt = jjj    # The value that we hunted to
-                        
+                        DtFactor = DtFactor_init  # reset DtFactor to initial choice
+                        htf['iml_hunt_incr'] = iml_hunt_incr_init  # reset iml_hunt_incr to initial choice
+
+                        hFlag = 0  # Hunting flag (Stop hunting)
+                        tFlag = 1  # Tracing flag (Now we are tracing)
+                        j_hunt = jjj  # The value that we hunted to
+
                         # Find the difference between the hunting collapse and the last stable point before it
-                        iml_diff = iml[iii][j_hunt] - iml[iii][j_hunt-1]
-        
+                        iml_diff = iml[iii][j_hunt] - iml[iii][j_hunt - 1]
+
                         # Remove the last entry of iml
                         iml[iii][j_hunt] = 0.0
                         d_max[iii][j_hunt] = 0.0
-                        
+
                         # Check to see if the first hunt cause a collapse, this is very unlikely
                         if j_hunt == 1:
-                            error_log.append("WARNING:  Run: "+run+", File: "+gm_names[iii]+" collapsed on first hunt, reduce the initial intensity...")
+                            error_log.append("WARNING:  Run: " + run + ", File: " + gm_names[
+                                iii] + " collapsed on first hunt, reduce the initial intensity...")
                             if ops.getNP() == 1: print(error_log[-1])
-        
-                    elif coll_index == -1: #convergence problem
-                        htf['iml_hunt_incr'] = htf['iml_hunt_incr']*0.9 # reduce the hunt incr
-                        DtFactor = DtFactor*0.5 # reduce analysis time step
+
+                    elif coll_index == -1:  # convergence problem
+                        htf['iml_hunt_incr'] = htf['iml_hunt_incr'] * 0.9  # reduce the hunt incr
+                        DtFactor = DtFactor * 0.5  # reduce analysis time step
                         # Remove the last entry of iml
                         iml[iii][jjj] = 0.0
                         d_max[iii][jjj] = 0.0
                     elif coll_index == 0:
                         # No collapse occurred so we can increment the counter and proceed hunting
                         jjj += 1
-        
+
                 ######### Tracing part
                 elif tFlag == 1:
                     temp_conv = 0
                     gm_text = "Tracing... GM: " + str(iii + 1) + "   Run: " + str(jjj)
                     if ops.getNP() == 1: print(gm_text)
-                    log.write(gm_text+'\n')
-        
+                    log.write(gm_text + '\n')
+
                     # Set the tracing iml increments, but set lower limit to avoid tracing too finely
-                    iml_incr_trace = max(htf['iml_trace_incr']*iml_diff, htf['iml_min_trace'])
-                    
+                    iml_incr_trace = max(htf['iml_trace_incr'] * iml_diff, htf['iml_min_trace'])
+
                     # Get new iml and sf
-                    iml[iii][jjj] = iml[iii][jjj-1] + iml_incr_trace
-                    gm['sf'] = iml[iii][jjj]/iml_curr_gm
-                    
+                    iml[iii][jjj] = iml[iii][jjj - 1] + iml_incr_trace
+                    gm['sf'] = iml[iii][jjj] / iml_curr_gm
+
                     # Build and run the OpenSees model
                     mdrft, cIndex = analyze(gm, IDAdir)
                     d_max[iii][jjj] = mdrft
                     coll_index = cIndex
-        
+
                     # If we get a collapse
                     if coll_index == 1:
-                        j_trace = jjj   # The value that we traced to
+                        j_trace = jjj  # The value that we traced to
                         # Check to see if the first trace cause a collapse
                         if j_trace - j_hunt == 0:
-                            error_log.append("WARNING:  Run: "+run+", File: "+gm_names[iii]+" collapsed on first trace, reducing the intensity increment...")
+                            error_log.append("WARNING:  Run: " + run + ", File: " + gm_names[
+                                iii] + " collapsed on first trace, reducing the intensity increment...")
                             if ops.getNP() == 1: print(error_log[-1])
-                            htf['iml_trace_incr'] = htf['iml_trace_incr']*0.8
+                            htf['iml_trace_incr'] = htf['iml_trace_incr'] * 0.8
                         else:
                             htf['iml_trace_incr'] = iml_trace_incr_init
-                            DtFactor = DtFactor_init # reset DtFactor to initial choice
-        
+                            DtFactor = DtFactor_init  # reset DtFactor to initial choice
+
                             # Set the demand as the max value
                             d_max[iii][jjj] = Dc
-                            
-                            tFlag = 0   # Hunting flag (Stop tracing)
-                            fFlag = 1   # Tracing flag (Now we are filling)
+
+                            tFlag = 0  # Hunting flag (Stop tracing)
+                            fFlag = 1  # Tracing flag (Now we are filling)
                             jjj += 1
-                            
-                    elif coll_index == -1: # There is a convergence problem!
-                        if temp_conv < 2: # first reduce the analysis time step
-                            DtFactor = DtFactor*0.5
+
+                    elif coll_index == -1:  # There is a convergence problem!
+                        if temp_conv < 2:  # first reduce the analysis time step
+                            DtFactor = DtFactor * 0.5
                             # Remove the last entry of iml
                             temp_conv += 1
-                        else: # if this does not work twice reduce the trace incr
-                            DtFactor = DtFactor_init; temp_conv = 0
-                            htf['iml_trace_incr'] = htf['iml_trace_incr']*0.8   
+                        else:  # if this does not work twice reduce the trace incr
+                            DtFactor = DtFactor_init;
+                            temp_conv = 0
+                            htf['iml_trace_incr'] = htf['iml_trace_incr'] * 0.8
                         iml[iii][jjj] = 0.0
                         d_max[iii][jjj] = 0.0
-        
+
                     elif coll_index == 0:
                         # No collapse occurred so we can increment the counter and proceed
                         jjj += 1
-        
+
                 ######### Filling part
                 elif fFlag == 1:
                     gm_text = "Filling... GM: " + str(iii + 1) + "   Run: " + str(jjj)
                     if ops.getNP() == 1: print(gm_text)
-                    log.write(gm_text+'\n')
-                    
+                    log.write(gm_text + '\n')
+
                     # Sort out the iml array
                     iml_srt = np.sort(iml[iii])
-                    
+
                     # Find the biggest gap
                     iml_gap = 0.0
                     for kkk in np.arange(htf['num_runs'] - 1):
                         temp = iml_srt[kkk + 1] - iml_srt[kkk]
                         if temp > iml_gap:
                             iml_gap = temp
-                            iml_fill = iml_srt[kkk] + iml_gap*0.5
-                    if fc_flag == 1: # this is very weird, it should not have collapsed
-                    	temp_factor = temp_factor*0.9
-                    	iml_fill = iml_fill*temp_factor
-        
+                            iml_fill = iml_srt[kkk] + iml_gap * 0.5
+                    if fc_flag == 1:  # this is very weird, it should not have collapsed
+                        temp_factor = temp_factor * 0.9
+                        iml_fill = iml_fill * temp_factor
+
                     # Add the new intensity to the iml array
                     iml[iii][jjj] = iml_fill
-                    gm['sf'] = iml[iii][jjj]/iml_curr_gm
-                    
+                    gm['sf'] = iml[iii][jjj] / iml_curr_gm
+
                     # Build and run the OpenSees model
                     mdrft, cIndex = analyze(gm, IDAdir)
                     d_max[iii][jjj] = mdrft
-                    coll_index = cIndex      
-                    
+                    coll_index = cIndex
+
                     # If we get a collapse
-                    if coll_index == 1: 
-                        error_log.append("WARNING:  Run: "+run+", File: "+gm_names[iii]+" collapsed while filling... changing iml_fill")
+                    if coll_index == 1:
+                        error_log.append("WARNING:  Run: " + run + ", File: " + gm_names[
+                            iii] + " collapsed while filling... changing iml_fill")
                         if ops.getNP() == 1: print(error_log[-1])
                         iml[iii][jjj] = 0.0
                         d_max[iii][jjj] = 0.0
                         fc_flag = 1
                     elif coll_index == -1:
-                        DtFactor = DtFactor*0.5 # just try decreasing the analysis time step
+                        DtFactor = DtFactor * 0.5  # just try decreasing the analysis time step
                         # Remove the last entry of iml
                         iml[iii][jjj] = 0.0
                         d_max[iii][jjj] = 0.0
                     elif coll_index == 0:
                         # No collapse occurred so we can increment the counter and proceed
-                        DtFactor = DtFactor_init # reset the analysis time step
+                        DtFactor = DtFactor_init  # reset the analysis time step
                         jjj += 1
                         fc_flag = 0
                         temp_factor = 1
-        
-            DtFactor = DtFactor_init # reset DtFactor to initial choice
+
+            DtFactor = DtFactor_init  # reset DtFactor to initial choice
             # Sort the ouputted arrays  
             iml_sorted[iii] = np.sort(iml[iii])
-            d_max_sorted[iii] = [x for _,x in sorted(zip(iml[iii],d_max[iii]))]
-    
+            d_max_sorted[iii] = [x for _, x in sorted(zip(iml[iii], d_max[iii]))]
+
         self.iml_IDA = iml_sorted
         self.edp_IDA = d_max_sorted
 
@@ -2089,16 +2193,17 @@ class Main(Builder, BridgeSummary, PierInfo):
             print("\
 #########################################################################\n\
              Incremental Dynamic Analysis (IDA) is Completed!            \n\
-#########################################################################") 
+#########################################################################")
         else:
             print("Processor %d Completed Incremental Dynamic Analysis (IDA)!" % pid)
             log.write("Completed Incremental Dynamic Analysis (IDA)!\n")
-            
+
         for error in error_log:
             log.write('%s\n' % error)
-        np.savetxt(os.path.join(direc,str(pid)+'_IM.txt'),np.transpose(self.iml_IDA))
-        np.savetxt(os.path.join(direc,str(pid)+'_EDP.txt'),np.transpose(self.edp_IDA))
+        np.savetxt(os.path.join(direc, str(pid) + '_IM.txt'), np.transpose(self.iml_IDA))
+        np.savetxt(os.path.join(direc, str(pid) + '_EDP.txt'), np.transpose(self.edp_IDA))
         log.close()
+
 
 def units(pFlag=0):
     return def_units(pFlag)

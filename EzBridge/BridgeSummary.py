@@ -2,6 +2,7 @@ import openseespy.opensees as ops
 from .Utility import def_units, create_outdir
 import numpy as np
 import os
+import pandas as pd
 
 class PierInfo():
 
@@ -241,11 +242,11 @@ class BridgeSummary:
     
     @staticmethod
     def PILECOST(DPile): # pile construction cost (EUR/m)
-        if DPile==1.5:
+        if DPile>=1.5:
             costpilecons=305.15+176.61 # ANAS Unitary price list B.02.035.d and B.02.046.d 
-        elif DPile==1.0:
+        elif 0.8<DPile<1.5:
             costpilecons=151.73 # ANAS Unitary price list B.02.035.b 
-        elif DPile==0.8:
+        elif DPile<=0.8:
             costpilecons=108.03 # ANAS Unitary price list B.02.035.a
         return costpilecons
     
@@ -498,28 +499,62 @@ class BridgeSummary:
         ACapBeamFW = self.num_bents*(2*(b_bc*h_bc)+2*(L_bc*h_bc)+(b_bc*L_bc))
         
         ######### FOUNDATION FOOTING MATERIAL QUANTITIES #########
-        if Vs30>=760:
-            FootingConc_Vol=self.num_bents*(6.5*6.5*2.5)
-            AFootingFW=self.num_bents*((2*6.5*6.5)+4*(6.5*2.5))
-        elif Vs30>=200 and Vs30<760:
-            FootingConc_Vol=self.num_bents*(7.5*7.5*2.0)
-            AFootingFW=self.num_bents*((2*7.5*7.5)+4*(6.5*2.0))
-        elif Vs30<200:
-            FootingConc_Vol=self.num_bents*(8.5*8.5*1.5)
-            AFootingFW=self.num_bents*((2*8.5*8.5)+4*(8.5*1.5))
-        # PILE FOUNDATION MATERIAL QUANTITIES
-        if Vs30>=760:
-            PileLength=self.num_bents*(4*10)
-            DPile=1.50
-        elif Vs30>=200 and Vs30<760:
-            PileLength=self.num_bents*(9*15)
-            DPile=1.0
-        elif Vs30<200:
-            PileLength=self.num_bents*(16*20)
-            DPile=0.80
-        PileVolume=0.25*np.pi*(DPile**2)*PileLength        
-        FootingSteel_Weight=SRfooting*FootingConc_Vol
-    
+        if self.model['Bent_Foundation']['Type'] == 'Fixed' or self.model['Bent_Foundation']['Type'] == 'Springs':
+            if Vs30>=760:
+                FootingConc_Vol=self.num_bents*(6.5*6.5*2.5)
+                AFootingFW=self.num_bents*((2*6.5*6.5)+4*(6.5*2.5))
+            elif Vs30>=200 and Vs30<760:
+                FootingConc_Vol=self.num_bents*(7.5*7.5*2.0)
+                AFootingFW=self.num_bents*((2*7.5*7.5)+4*(6.5*2.0))
+            elif Vs30<200:
+                FootingConc_Vol=self.num_bents*(8.5*8.5*1.5)
+                AFootingFW=self.num_bents*((2*8.5*8.5)+4*(8.5*1.5))
+            # PILE FOUNDATION MATERIAL QUANTITIES
+            if Vs30>=760:
+                PileLength=self.num_bents*(4*10)
+                DPile=1.50
+            elif Vs30>=200 and Vs30<760:
+                PileLength=self.num_bents*(9*15)
+                DPile=1.0
+            elif Vs30<200:
+                PileLength=self.num_bents*(16*20)
+                DPile=0.80
+            PileVolume=0.25*np.pi*(DPile**2)*PileLength
+            FootingSteel_Weight=SRfooting*FootingConc_Vol
+        elif self.model['Bent_Foundation']['Type'] == 'Pile-Shaft':
+            PileVolume=0
+            DPiles = []
+            PileLengths = []
+            for i in range(self.num_bents):
+                data = pd.read_excel(open('SoilProfiles.xlsx', 'rb'),
+                                     sheet_name='Bent' + str(i + 1))
+                PileLengths.append(np.sum(data['Thickness'])*self.model['Bent']['N'])
+                idx = self.model['Bent_Foundation']['Sections'][i]-1
+                DPiles.append(self.model['Bent_Foundation']['D'][idx])
+                PileVolume += 0.25*np.pi*(DPiles[i]**2)*PileLengths[i]
+            DPile = np.mean(DPiles)
+            PileLength = np.sum(PileLengths)
+            AFootingFW=0
+            FootingConc_Vol = 0
+            FootingSteel_Weight = 0
+        elif self.model['Bent_Foundation']['Type'] == 'Group Pile':
+            PileVolume=0
+            DPiles = []
+            PileLengths = []
+            for i in range(self.num_bents):
+                data = pd.read_excel(open('SoilProfiles.xlsx', 'rb'),
+                                     sheet_name='Bent' + str(i + 1))
+                PileLengths.append(np.sum(data['Thickness'])*self.model['Bent_Foundation']['nx'][idx]*self.model['Bent_Foundation']['ny'][idx])
+                idx = self.model['Bent_Foundation']['Sections'][i]-1
+                DPiles.append(self.model['Bent_Foundation']['D'][idx])
+                PileVolume += 0.25*np.pi*(DPiles[i]**2)*PileLengths[i]
+            cap_A = self.model['Bent_Foundation']['cap_A']
+            cap_t = self.model['Bent_Foundation']['cap_t']
+            AFootingFW=self.num_bents*((2*cap_A)+4*(cap_A/10*cap_t))
+            FootingConc_Vol = self.num_bents*cap_A*cap_t
+            FootingSteel_Weight=SRfooting*FootingConc_Vol
+            DPile = np.mean(DPiles)
+            PileLength = np.sum(PileLengths)
         ######### SUPERSTRUCTURE CONSTRUCTION COST #########
         # Superstructure Concrete Cost
         costsupconc=self.CONCCOST(fc_super)
@@ -574,7 +609,7 @@ class BridgeSummary:
     
         ######### CAP-BEAM CONSTRUCTION COST #########
         # Cap-Beam Concrete Cost
-        fc_bc = (self.model['BentCap']['E']/(5000*MPa))**2
+        fc_bc = fc_super
         costcapbeamconc=self.CONCCOST(fc_bc)
         CapBeamConc_Cost=CapBeamConc_Vol*costcapbeamconc
         # Cap-Beam Steel Cost
@@ -829,11 +864,11 @@ class BridgeSummary:
                         
                         # Repair Action: Intervention in the Foundation
                         UCFI=self.DEMOLCOVERCOST() # Unitary cost of demolition of cover concrete (EUR/m3)
-                        if DPile==1.5:
+                        if DPile>=1.5:
                             hf=2.5
-                        elif DPile==1.0:
+                        elif DPile>0.8 and DPile<1.5:
                             hf=2
-                        elif DPile==0.8:
+                        elif DPile<=0.8:
                             hf=1.5
                         VFI=0.25*np.pi*(DPiers[p_idx]**2)*0.8*hf # Embedded volume of pier
                         TCFI=UCFI*VFI

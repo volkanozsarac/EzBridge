@@ -692,7 +692,10 @@ def nrha_multiple(obj, Dt, Tmax, Dc, log, pflag=0):
     Ky2 = [] # Pier element yield curvatures in dir 2
     Dispy1 = [] # Pier element yield displacements in dir 1
     Dispy2 = [] # Pier element yield displacements in dir 2
-    
+
+    abut1 = 0		# Displacement of start abutment node
+    abut2 = 0		# Displacement of end abutment node
+
     for i in range(len(obj.EleIDsBent)):
         for j in range(len(obj.EleIDsBent[i])):
             eleNodes = ops.eleNodes(obj.EleIDsBent[i][j])
@@ -716,16 +719,20 @@ def nrha_multiple(obj, Dt, Tmax, Dc, log, pflag=0):
 
     # Define the Initial Analysis Parameters
     testType = 'NormDispIncr'  # Set the initial test type (default)
-    tolInit = 1.0e-7  # Set the initial Tolerance, so it can be referred back to (default)
+    tolInit = 1.0e-6  # Set the initial Tolerance, so it can be referred back to (default)
     iterInit = 50  # Set the initial Max Number of Iterations (default)
     algorithmType = 'KrylovNewton'  # Set the initial algorithm type (default)
+    
     # Parameters required in Newmark Integrator
+    # gamma = 1/2, beta = 1/4 --> Average Acceleration Method
+    # gamma = 1/2, beta = 1/6 --> Linear Acceleration Method
     gamma = 0.5
-    beta = 0.25  # gamma = 1/2, beta = 1/4 --> Average Acceleration Method; # gamma = 1/2, beta = 1/6 --> Linear
-    # Acceleration Method;
+    beta = 0.25  
+
     # Parameters required in Hilber-Hughes-Taylor (HHT) integrator
-    alpha = 0.85  # alpha = 1.0 = Newmark Method. smaller alpha means greater numerical damping. 0.67<alpha<1.0
-    # recommended. Leave beta and gamma as default for unconditional stability.
+    # alpha = 1.0 = Newmark Method. smaller alpha means greater numerical damping. 
+    # 0.67<alpha<1.0 recommended. Leave beta and gamma as default for unconditional stability.
+    alpha = 0.8  
 
     # Set up analysis parameters
     cIndex = 0  # Initially define the control index (-1 for non-converged, 0 for stable, 1 for global collapse)
@@ -737,6 +744,7 @@ def nrha_multiple(obj, Dt, Tmax, Dc, log, pflag=0):
     # Run the actual analysis now
     while cIndex == 0 and controlTime <= Tmax and ok == 0:
         # Set the default analysis parameters
+        ops.integrator('HHT', alpha)  # Hail Mary... Bless the analysis with thy damping!
         ops.integrator('Newmark', gamma, beta)
         ops.test(testType, tolInit, iterInit)
         ops.algorithm(algorithmType)
@@ -752,7 +760,8 @@ def nrha_multiple(obj, Dt, Tmax, Dc, log, pflag=0):
         k = 0  # counter for the integrators
         while k < 2 and ok != 0:
             if k == 1:
-                ops.integrator('HHT', alpha)  # Hail Mary... Bless the analysis with thy damping!
+                ops.integrator('Newmark', gamma, beta)
+                # ops.integrator('HHT', alpha)  # Hail Mary... Bless the analysis with thy damping!
                 print(" ~~~ Changing integrator to Hilber-Hughes-Taylor (HHT) from Newmark at %.2f......" % controlTime)
             # First changes are to change algorithm to achieve convergence...
             if ok != 0:
@@ -783,44 +792,46 @@ def nrha_multiple(obj, Dt, Tmax, Dc, log, pflag=0):
             # Next change both algorithm and tolerance to achieve convergence....
             if ok != 0:
                 print(" ~~~ Failed at %.2f - Trying Broyden & relaxed convergence......" % controlTime)
-                ops.test(testType, tolInit * 0.1, iterInit * 50)
+                ops.test(testType, tolInit * 0.1, iterInit * 10)
+                # ops.test(testType, tolInit * 0.1)
                 ops.algorithm('Broyden', 8)
                 ok = ops.analyze(1, Dt)
 
             if ok != 0:
-                print(
-                    " ~~~ Failed at %.2f - Trying Newton with Initial Tangent & relaxed convergence......" % controlTime)
-                ops.test(testType, tolInit * 0.1, iterInit * 50)
+                print(" ~~~ Failed at %.2f - Trying Newton with Initial Tangent & relaxed convergence......" % controlTime)
+                ops.test(testType, tolInit * 0.1, iterInit * 10)
+                # ops.test(testType, tolInit * 0.1)
                 ops.algorithm('Newton', '-initial')
                 ok = ops.analyze(1, Dt)
 
             if ok != 0:
                 print(" ~~~ Failed at %.2f - Trying NewtonWithLineSearch & relaxed convergence......" % controlTime)
-                ops.test(testType, tolInit * 0.1, iterInit * 50)
+                ops.test(testType, tolInit * 0.1, iterInit * 10)
+                # ops.test(testType, tolInit * 0.1)
                 ops.algorithm('NewtonLineSearch', 0.8)
                 ok = ops.analyze(1, Dt)
 
             # Next half the timestep with both algorithm and tolerance reduction, if this doesn't work - in bocca al lupo
             if ok != 0:
-                print(
-                    " ~~~ Failed at %.2f - Trying Broyden, reduced timestep & relaxed convergence......" % controlTime)
-                ops.test(testType, tolInit * 0.1, iterInit * 50)
+                print( " ~~~ Failed at %.2f - Trying Broyden, reduced timestep & relaxed convergence......" % controlTime)
+                ops.test(testType, tolInit * 0.1, iterInit * 10)
+                # ops.test(testType, tolInit * 0.1)
                 ops.algorithm('Broyden', 8)
                 Dtt = 0.5 * Dt
                 ok = ops.analyze(1, Dtt)
 
             if ok != 0:
-                print(
-                    " ~~~ Failed at %.2f - Trying Newton with Initial Tangent, reduced timestep & relaxed convergence......" % controlTime)
-                ops.test(testType, tolInit * 0.1, iterInit * 50)
+                print(" ~~~ Failed at %.2f - Trying Newton with Initial Tangent, reduced timestep & relaxed convergence......" % controlTime)
+                ops.test(testType, tolInit * 0.1, iterInit * 10)
+                # ops.test(testType, tolInit * 0.1)
                 ops.algorithm('Newton', '-initial')
                 Dtt = 0.5 * Dt
                 ok = ops.analyze(1, Dtt)
 
             if ok != 0:
-                print(
-                    " ~~~ Failed at %.2f - Trying NewtonWithLineSearch, reduced timestep & relaxed convergence......" % controlTime)
-                ops.test(testType, tolInit * 0.1, iterInit * 50)
+                print(" ~~~ Failed at %.2f - Trying NewtonWithLineSearch, reduced timestep & relaxed convergence......" % controlTime)
+                ops.test(testType, tolInit * 0.1, iterInit * 10)
+                # ops.test(testType, tolInit * 0.1)
                 ops.algorithm('NewtonLineSearch', 0.8)
                 Dtt = 0.5 * Dt
                 ok = ops.analyze(1, Dtt)
@@ -829,7 +840,7 @@ def nrha_multiple(obj, Dt, Tmax, Dc, log, pflag=0):
         # Shit...  Failed to converge, exit the analysis.
         if ok != 0:
             print(" ~~~ Failed at %.2f - exit the analysis......" % controlTime)
-            ops.wipe();
+            ops.wipe()
             cIndex = -1
 
         if ok == 0:
@@ -865,6 +876,17 @@ def nrha_multiple(obj, Dt, Tmax, Dc, log, pflag=0):
                 if cdrft >= mdrft[i]: mdrft[i] = cdrft
                 if cdrft > Mdrft: Mdrft = cdrft; mflr = i + 1  # Update the current maximum pier drift and where it is
 
+            if obj.model['Abutment_BackFill']['Type'] != 'None':
+                # Abutment Displacements
+                for i in range(len(obj.EleIDsAB1)):
+                    disps1 = ops.basicDeformation(obj.EleIDsAB1[i])
+                    abut1_temp = ((disps1[0] ** 2) + (disps1[1] ** 2)) ** 0.5
+                    if abut1_temp > abut1: abut1 = abut1_temp
+
+                    disps2 = ops.basicDeformation(obj.EleIDsAB2[i])
+                    abut2_temp = ((disps2[0] ** 2) + (disps2[1] ** 2)) ** 0.5
+                    if abut2_temp > abut2: abut2 = abut2_temp
+
             if Mdrft >= Dc: cIndex = 1; Mdrft = Dc; ops.wipe()  # Set the state of the model to local collapse (=1)
 
     if cIndex == -1:
@@ -897,4 +919,4 @@ def nrha_multiple(obj, Dt, Tmax, Dc, log, pflag=0):
         f.write("%")
         f.close()
 
-    return Mdrft, cIndex, mflr, mdrft, mudisp, muK, Analysis
+    return Mdrft, cIndex, mflr, mdrft, mudisp, muK, Analysis, [abut1, abut2]
