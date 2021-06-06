@@ -7,7 +7,6 @@ import pandas as pd
 from .Utility import distance, getRectProp, getCircProp, def_units
 from .Utility import get_pyParam_sand, get_pyParam_clay, get_tzParam, get_qzParam
 
-
 class RC_Circular:
 
     def __init__(self):
@@ -33,6 +32,27 @@ class RC_Circular:
 
         # Some constants
         g = 9.81 * m / sec ** 2
+
+    @staticmethod
+    def _circ_fiber_config(D):
+        # Notes
+        # The center of the reinforcing bars are placed at the inner radius
+        # The core concrete ends at the inner radius (same as reinforcing bars)
+        # The reinforcing bars are all the same size
+        # The center of the section is at (0,0) in the local axis system
+        # Zero degrees is along section y-axis
+        yC = 0  # y-axis for center of circular section
+        zC = 0  # z-axis for center of circular section
+        startAng = 0  # start angle of circular section
+        endAng = 360  # end angle of circular section
+        ri = 0.0  # diameter of hollow section
+        ro = D / 2  # outer diameter of section
+        nfCoreR = 10  # number of radial divisions in the core (number of "rings")
+        nfCoreT = 10  # number of theta divisions in the core (number of "wedges")
+        nfCoverR = 2  # number of radial divisions in the cover
+        nfCoverT = 10  # number of theta divisions in the cover
+
+        return yC, zC, startAng, endAng, ri, ro, nfCoreR, nfCoreT, nfCoverR, nfCoverT
 
     def _def_BentCirc_Sec(self):
         # Define RC pier sections
@@ -69,7 +89,7 @@ class RC_Circular:
                     Lpl2 = (0.08 * Hcol / 2 / mm + 0.044 * dl * Fyle) * mm
                 else:
                     Lpl2 = Lpl1
-
+                
                 P = min(self.BentAxialForces[i])
                 param1 = self._Circ_MPhi(D / mm, cc / mm, numBars, dl / mm, s / mm, dh / mm,
                                          TransReinfType, P, Fce / MPa, Fyle / MPa,
@@ -200,27 +220,6 @@ class RC_Circular:
 
         return SecTags, SecWs
 
-    @staticmethod
-    def _circ_fiber_config(D):
-        # Notes
-        # The center of the reinforcing bars are placed at the inner radius
-        # The core concrete ends at the inner radius (same as reinforcing bars)
-        # The reinforcing bars are all the same size
-        # The center of the section is at (0,0) in the local axis system
-        # Zero degrees is along section y-axis
-        yC = 0  # y-axis for center of circular section
-        zC = 0  # z-axis for center of circular section
-        startAng = 0  # start angle of circular section
-        endAng = 360  # end angle of circular section
-        ri = 0.0  # diameter of hollow section
-        ro = D / 2  # outer diameter of section
-        nfCoreR = 10  # number of radial divisions in the core (number of "rings")
-        nfCoreT = 10  # number of theta divisions in the core (number of "wedges")
-        nfCoverR = 2  # number of radial divisions in the cover
-        nfCoverT = 10  # number of theta divisions in the cover
-
-        return yC, zC, startAng, endAng, ri, ro, nfCoreR, nfCoreT, nfCoverR, nfCoverT
-
     def _circ_Fiber(self, Fyle, Fyhe, Fce, D, cc, numBars, dl, dh, s, TransReinfType):
         #  ------------------------------------------------------------------------------------------------------------
         #  CIRCULAR RC FIBER SECTION
@@ -228,28 +227,19 @@ class RC_Circular:
 
         ######### DEFINE MATERIALS #########
         # Based on Mander et al. 1988
+        steelID = self.EndMatTag + 1
         self.EndMatTag += 1
-        steelID = self.EndMatTag
+        coverID = self.EndMatTag + 1
         self.EndMatTag += 1
-        coverID = self.EndMatTag
+        coreID = self.EndMatTag + 1
         self.EndMatTag += 1
-        coreID = self.EndMatTag
+        torsionID = self.EndMatTag + 1
         self.EndMatTag += 1
-        torsionID = self.EndMatTag
+        MinMaxID = self.EndMatTag + 1
         self.EndMatTag += 1
-        MinMaxID = self.EndMatTag
+        ShearID = self.EndMatTag + 1
         self.EndMatTag += 1
-        ShearID = self.EndMatTag
-
         numBars = int(numBars)
-
-        # Fc_piers = self.model['Bent']['Fce']
-        # Fy_piers = self.model['Bent']['Fye']
-        # dl_piers = self.model['Bent']['dl']
-        # num_bars = self.model['Bent']['numBars']
-        # s_piers = self.model['Bent']['s']
-        # dh_piers = self.model['Bent']['dh']
-        # Reinf_Type = self.model['Bent']['TransReinfType']
 
         # Fyle:              Expected yield strength of longitudinal steel bars
         # Fyhe:              Expected yield strength of transversal steelbars
@@ -263,7 +253,6 @@ class RC_Circular:
         # TransReinfType:    Type of transversal steel, 'Hoops' or 'Spirals'
 
         # Use mander model to get confinement factor
-        Ag = np.pi * D ** 2 / 4
         barArea = np.pi * dl ** 2 / 4
         Asl = numBars * barArea
         ds = D - 2 * cc  # Core diameter
@@ -281,7 +270,7 @@ class RC_Circular:
                 ds * s)  # Ratio of the volume of transverse confining steel to the volume of confined concrete core
         fpl = ke * 0.5 * Fyhe * ps  # Confinement pressure
         Kfc = (-1.254 + 2.254 * (1 + 7.94 * fpl / Fce) ** 0.5 - 2 * fpl / Fce)  # Confinement factor
-
+        # print('Confinement Factor = %.10f' % Kfc)
         # Concrete Properties
         Ec = 5000 * MPa * (Fce / MPa) ** 0.5  # Concrete Elastic Modulus
         Gc = Ec / (2 * (1 + 0.2))  # Concrete Elastic Shear Modulus
@@ -307,7 +296,8 @@ class RC_Circular:
         # # ops.uniaxialMaterial('Concrete02', coreID, fc1C, eps1C, fc2C, eps2C,Lambda,fctC,Ets)     # build core concrete (confined)
         # ops.uniaxialMaterial('Concrete01', coverID, fc1U, eps1U ,fc2U, eps2U)    # build cover concrete (unconfined)
         # ops.uniaxialMaterial('Concrete01', coreID, fc1C, eps1C, fc2C, eps2C)     # build core concrete (confined)
-
+        # # print('Concrete01', coreID, fc1C, eps1C, fc2C, eps2C)
+        
         # recommended parameters by Mander Model, concrete04
         # unconfined concrete compressive strength Properties
         fc1U = -Fce  # UNCONFINED concrete (todeschini parabolic model), maximum stress
@@ -329,14 +319,15 @@ class RC_Circular:
         # Generate Materials, uniaxial popovics concrete material
         # If the user defines Ec=5000∗sqrt(|fc|) (in MPa)’ then the envelope curve is identical to proposed by Mander et al. (1988).
         ops.uniaxialMaterial('Concrete04', coverID, fc1U, eps1U, eps2U, Ec, fct, et,
-                             beta)  # build cover concrete (unconfined)
+                              beta)  # build cover concrete (unconfined)
         ops.uniaxialMaterial('Concrete04', coreID, fc1C, eps1C, eps2C, Ec, fct, et,
-                             beta)  # build core concrete (confined)
+                              beta)  # build core concrete (confined)
 
-        # Torsional Properties 
+        # Torsion Material
         J = np.pi * D ** 4 / 32  # Polar moment of inertia for solid circular section
-        # Generate Materials
         ops.uniaxialMaterial('Elastic', torsionID, Gc * J)  # define elastic torsional stiffness
+        # Shear Material
+        Ag = np.pi * D ** 2 / 4 # Shear Area
         ops.uniaxialMaterial('Elastic', ShearID, Gc * Ag)  # define elastic shear stiffness
 
         # Reinforcing steel properties
@@ -354,16 +345,16 @@ class RC_Circular:
         ######### DEFINE SECTIONS #########
         yC, zC, startAng, endAng, ri, ro, nfCoreR, nfCoreT, nfCoverR, nfCoverT = self._circ_fiber_config(D)
         # Define the fiber section, neglect shear deformations
+        SecTag = self.EndSecTag + 1
         self.EndSecTag += 1
-        SecTag = self.EndSecTag
         ops.section('Fiber', SecTag, '-torsion', torsionID)
         rc = ro - cc  # Core radius
         ops.patch('circ', coreID, nfCoreT, nfCoreR, yC, zC, ri, rc, startAng, endAng)  # Define the core patch
         ops.patch('circ', coverID, nfCoverT, nfCoverR, yC, zC, rc, ro, startAng, endAng)  # Define the cover patch
         theta = endAng / numBars  # Determine angle increment between bars
         ops.layer('circ', MinMaxID, numBars, barArea, yC, zC, rc, theta, endAng)  # Define the reinforcing layer
+        SecTag = self.EndSecTag + 1
         self.EndSecTag += 1
-        SecTag = self.EndSecTag
         ops.section('Aggregator', self.EndSecTag, ShearID, 'Vy', ShearID, 'Vz', '-section', self.EndSecTag - 1)
 
     @staticmethod
@@ -871,14 +862,40 @@ class RC_Circular:
 
         return param
 
-
 class Builder(RC_Circular):
 
     def __init__(self):
-
+        """
+        --------------------------
+        OBJECT INITIALIZATION
+        --------------------------
+        """
         # INITIALIZE THE RC_Circular CLASS OBJECT USING INHERITANCE
         RC_Circular.__init__(self)  # This object defines the circular pier sections
 
+        #  ---------------------------
+        #  DEFINE UNITS
+        #  ---------------------------
+        global LunitTXT, FunitTXT, TunitTXT
+        global m, kN, sec, mm, cm, inch, ft, N, kip, tonne, kg, Pa, kPa, MPa, GPa, ksi, psi, degrees
+        global gamma_c, Ubig, Usmall, g
+
+        m, kN, sec, mm, cm, inch, ft, N, kip, tonne, kg, Pa, kPa, MPa, GPa, ksi, psi = def_units(0)
+
+        # Basic Units
+        LunitTXT = 'm'
+        FunitTXT = 'kN'
+        TunitTXT = 'sec'
+
+        # Angles
+        degrees = np.pi / 180.0
+
+        # Concrete unit weight
+        gamma_c = 25 * kN / m ** 3
+
+        # Some constants
+        g = 9.81 * m / sec ** 2
+        
         # Node Tags
         self.D1Tag = '001'  # Identifier for Deck nodes
         self.D2Tag = '002'  # Identifier for Deck nodes
@@ -913,7 +930,9 @@ class Builder(RC_Circular):
         MODEL BUILDER
         --------------------------
         """
+        
         ops.wipe()  # Remove any existing model
+        ops.wipeAnalysis()
         ops.model('basic', '-ndm', 3, '-ndf', 6)  # Define the model builder, ndm=#dimension, ndf=#dofs
 
         # Define dummies and counters
@@ -932,9 +951,9 @@ class Builder(RC_Circular):
         ops.uniaxialMaterial('Elastic', self.BigMat, 1e14)
         ops.section('Elastic', self.BigSec, 1e14, 1, 1, 1, 1e14, 1)
         ops.beamIntegration('Legendre', self.BigInt, self.BigSec, 2)
-        ops.section('Elastic', self.SmallSec, 1e-2, 1, 1, 1, 1e-2, 1)
+        ops.section('Elastic', self.SmallSec, 1e-5, 1, 1, 1, 1e-5, 1)
         ops.beamIntegration('Legendre', self.SmallInt, self.SmallSec, 2)
-        ops.uniaxialMaterial('Elastic', self.SmallMat, 10)
+        ops.uniaxialMaterial('Elastic', self.SmallMat, 1e-5)
         ops.uniaxialMaterial('Elastic', self.ZeroMat, 0)
         ops.uniaxialMaterial('Elastic', self.bigMat, 1e8)
 
@@ -959,13 +978,13 @@ class Builder(RC_Circular):
         self._abutment()  # Define abutment elements
         self._foundation()  # Define foundation elements
         self._constraints()  # Define constraints e.g. Rigid Links
-
+    
     def _deck(self):
         """
         --------------------------
         DECK MODELLING
         --------------------------
-        """
+        """ 
         # INPUTS
         DXs = self.model['Deck']['Xs']
         DYs = self.model['Deck']['Ys']
@@ -1060,7 +1079,7 @@ class Builder(RC_Circular):
             Vz = list(Vz)
             self.EndTransfTag += 1
             ops.geomTransf('Linear', self.EndTransfTag, *Vz)
-            eleList, nodeList = DiscretizeMember(self.D1Nodes[i], self.D2Nodes[i], numDeckEle, 'dispBeamColumn',
+            eleList, nodeList = DiscretizeMember(self.D1Nodes[i], self.D2Nodes[i], numDeckEle, 'forceBeamColumn',
                                                  self.EndIntTag, self.EndTransfTag, nodeTag, eleTag, wTOT / g,
                                                  self.mass_type)
 
@@ -1074,11 +1093,11 @@ class Builder(RC_Circular):
 
     def _linkslab(self):
         """
-        TODO: Need to Add Deck Hinge Option (or expansion joint) for Discontinuous Case
-        ---> if not self.model['LinkSlab']['cond'][i]
         --------------------------
         LINK SLAB MODELLING
         --------------------------
+        TODO: Need to Add Deck Hinge Option (or expansion joint) for Discontinuous Case
+        ---> if not self.model['LinkSlab']['cond'][i]
         """
         # INPUTS
         d = self.model['LinkSlab']['d']
@@ -1139,6 +1158,7 @@ class Builder(RC_Circular):
         --------------------------
         TODO: Discretization option for pier elements (can be imported in case of long piers)
         """
+
         # INPUTS
         self.num_piers = self.model['Bent']['N']
         H_piers = self.model['Bent']['H']
@@ -1177,7 +1197,7 @@ class Builder(RC_Circular):
             # Define Nodal Coordinates of the bent
             dist_mid = dist * (self.num_piers - 1) / 2
             zTop = DZs[i + 1] - self.model['Bearing']['dv'][i + 1] - self.model['Bearing']['h'][i + 1] - \
-                   self.model['BentCap']['h']
+                    self.model['BentCap']['h']
             zBot = zTop - H_piers[i]
             xBot = DXs[i + 1] - np.cos(skew + np.pi / 2) * dist_mid
             yBot = DYs[i + 1] - np.sin(skew + np.pi / 2) * dist_mid
@@ -1192,6 +1212,7 @@ class Builder(RC_Circular):
                 # NODES, node name: bent_idx_(1-2)_tag
                 nodeI = int(str(i + 1) + str(j + 1) + '1' + self.PTag)
                 nodeJ = int(str(i + 1) + str(j + 1) + '2' + self.PTag)
+                # nodeJ = self.D1Nodes[i+1]
                 botNodes.append(nodeI)
                 topNodes.append(nodeJ)
                 ops.node(nodeI, *CoordBot)
@@ -1213,11 +1234,19 @@ class Builder(RC_Circular):
             self.EleLoadsBent.append(wTOT)
 
     def _create_bearingmat(self, idx):
-
+        """
+        --------------------------------
+        BEARING MATERIAL FOR IDXth JOINT
+        --------------------------------
         # TODO:-1 BEARING MATERIALS - ADD BILINEAR SPRINGS
+
+        """
         if self.model['Bearing']['Type'][idx] == 'Elastic':
             matTags = []
-            eleType = 'twoNodeLink'
+            if self.model['Bearing']['h'][idx] < 1e-10:
+                eleType = 'zeroLength'
+            else:
+                eleType = 'twoNodeLink'
             self.EndMatTag += 1
             ops.uniaxialMaterial('Elastic', self.EndMatTag, self.model['Bearing']['kz'][idx])
             matTags.append(self.EndMatTag)  # vertical direction
@@ -1252,7 +1281,7 @@ class Builder(RC_Circular):
             self.EndMatTag += 1
             ops.uniaxialMaterial('Elastic', self.EndMatTag, Kvert)  # define elastic vertical stiffness material
             matArgs = [Kinit, Fb, alpha1, alpha2, mu, eta, beta, gamma,
-                       '-P', self.EndMatTag, '-T', self.SmallMat, '-My', self.SmallMat, '-Mz', self.SmallMat]
+                        '-P', self.EndMatTag, '-T', self.SmallMat, '-My', self.SmallMat, '-Mz', self.SmallMat]
 
         elif self.model['Bearing']['Type'][idx] == 'elastomericBearingPlasticity':
             eleType = 'elastomericBearingPlasticity'
@@ -1266,7 +1295,7 @@ class Builder(RC_Circular):
             self.EndMatTag += 1
             ops.uniaxialMaterial('Elastic', self.EndMatTag, Kvert)  # define elastic vertical stiffness material
             matArgs = [Kinit, Fb, alpha1, alpha2, mu,
-                       '-P', self.EndMatTag, '-T', self.SmallMat, '-My', self.SmallMat, '-Mz', self.SmallMat]
+                        '-P', self.EndMatTag, '-T', self.SmallMat, '-My', self.SmallMat, '-Mz', self.SmallMat]
 
         elif self.model['Bearing']['Type'][idx] == 'ElastomericX':
             eleType = 'ElastomericX'
@@ -1304,7 +1333,7 @@ class Builder(RC_Circular):
             self.EndMatTag += 1
             ops.frictionModel('Coulomb', self.EndMatTag, mu)
             matArgs = [self.EndMatTag, R, K, '-P', self.BigMat, '-T', self.SmallMat, '-My', self.SmallMat, '-Mz',
-                       self.SmallMat]
+                        self.SmallMat]
 
         # singleFPBearing with velocity dependent friction
         elif self.model['Bearing']['Type'][idx] == 'singleFPBearing_velocity':
@@ -1317,7 +1346,7 @@ class Builder(RC_Circular):
             self.EndMatTag += 1
             ops.frictionModel('VelDependent', self.EndMatTag, muSlow, muFast, transRate)
             matArgs = [self.EndMatTag, R, K, '-P', self.BigMat, '-T', self.SmallMat, '-My', self.SmallMat, '-Mz',
-                       self.SmallMat]
+                        self.SmallMat]
 
         # flatSliderBearing with coulomb friction
         elif self.model['Bearing']['Type'][idx] == 'flatSliderBearing_coulomb':
@@ -1327,7 +1356,7 @@ class Builder(RC_Circular):
             self.EndMatTag += 1
             ops.frictionModel('Coulomb', self.EndMatTag, mu)
             matArgs = [self.EndMatTag, K, '-P', self.BigMat, '-T', self.SmallMat, '-My', self.SmallMat, '-Mz',
-                       self.SmallMat]
+                        self.SmallMat]
 
         # flatSliderBearing with velocity dependent friction
         elif self.model['Bearing']['Type'][idx] == 'flatSliderBearing_velocity':
@@ -1339,26 +1368,39 @@ class Builder(RC_Circular):
             self.EndMatTag += 1
             ops.frictionModel('VelDependent', self.EndMatTag, muSlow, muFast, transRate)
             matArgs = [self.EndMatTag, K, '-P', self.BigMat, '-T', self.SmallMat, '-My', self.SmallMat, '-Mz',
-                       self.SmallMat]
+                        self.SmallMat]
 
         return matArgs, eleType
-
+    
     def _bearing(self):
         """
         --------------------------
         BEARING MODELLING
         --------------------------
         """
+        # vecx = [1,0,0];  vecyp = [0,1,0]   
+        # j = 0
+        # # which one is more correct? Rigid link or equalDOF? I believe, it should be rigid link
+        # for i in range(self.num_bents):
+        #     matArgs, eleType = self._create_bearingmat(idx = i+1)
+        #     ops.node(i+1,*ops.nodeCoord(self.BentEndNodes[i][0])) # create nodes for link1, between deck bottom and pier top
+            
+        #     self.RigidLinkNodes.append([i+1, self.D1Nodes[i+1]])
+        #     if self.model['Bearing']['h'][i+1] < 1e-10:
+        #         eleArgs = [*matArgs, '-orient', *vecx, *vecyp]  # zerolength element
+        #     else:
+        #         eleArgs = [*matArgs, '-orient', *vecyp]
+            
+        #     eleNodes = [self.BentEndNodes[i][0], i+1]
+        #     eleTag = int(str(i + 1) + str(j + 1) + '0' + self.BearingTag)
+        #     ops.element(eleType, eleTag, *eleNodes, *eleArgs)
 
         # INFORMATION TO SAVE
         self.AB1Nodes = []  # Bearing bottom nodes at abutment 1
         self.AB2Nodes = []  # Bearing bottom nodes at abutment 2
         self.BcapNodes = []  # Bearing bottom nodes at bentcaps
         self.EleIDsBearing = []  # Bearing element IDs
-
-        # self.AB1Nodes.append(self.D1Nodes[0])
-        # self.AB2Nodes.append(self.D2Nodes[-1])
-
+        
         if self.model['Deck']['Type'] == 'Discontinuous':
             vecx = [0, 0, 1]
             for i in range(self.num_spans + 1):  # AT EACH SPAN END
@@ -1577,8 +1619,8 @@ class Builder(RC_Circular):
                         BCnode = int(str(i) + str(j) + self.BC1Tag)  # Node on bentcap
                         ops.node(BCnode, x0, y0, z0)
                         BcapNodes.append(BCnode)
-                        self.RigidLinkNodes.append([self.D1Nodes[i], Bnode2])
                         self.RigidLinkNodes.append([BCnode, Bnode1])
+                        self.RigidLinkNodes.append([self.D1Nodes[i], Bnode2])
 
                     # UPDATE
                     x0 += round(np.cos(skew + np.pi / 2) * self.model['Bearing']['s'][i], 5)
@@ -1587,7 +1629,7 @@ class Builder(RC_Circular):
                 # SAVE
                 self.EleIDsBearing.append(Bearings)
                 if any(BcapNodes): self.BcapNodes.append(BcapNodes)
-
+        
     def _bentcap(self):
         """
         --------------------------
@@ -1698,16 +1740,25 @@ class Builder(RC_Circular):
                     self.EleLoadsBcap.append(wTOT)
 
     def _abutment(self):
-        # TODO: Option of Hyperbolic Gap material 
-        # TODO: distributed soil springs (more than 2)
-        #  ------------------------------------------------------------------------------------------------------------
-        #  MODELLING OF ABUTMENT BACKFILL SOIL
-        #  ------------------------------------------------------------------------------------------------------------
+        """
+        --------------------------------------------
+        MODELLING OF ABUTMENT BACKFILL SOIL
+        --------------------------------------------
+        TODO: Option of Hyperbolic Gap material 
+        TODO: distributed soil springs (more than 2)
+        """
+        
         if self.model['Abutment_Foundation']['Type'] == 'Fixed':
             KvMat = self.BigMat
+            KRxMat = self.BigMat
+            KRyMat = self.BigMat
+            KRzMat = self.BigMat
         else:
             KvMat = self.SmallMat
-
+            KRxMat = self.SmallMat
+            KRyMat = self.SmallMat
+            KRzMat = self.SmallMat
+            
         if self.model['Abutment_BackFill']['Type'] == 'None':
             self.fixed_AB1Nodes = []
             self.fixed_AB2Nodes = []
@@ -1738,9 +1789,9 @@ class Builder(RC_Circular):
             else:
                 ops.uniaxialMaterial('Steel01', self.EndMatTag, Fyy[0], Ky[0], bx[0])
             MatTags1.append(KvMat)
-            MatTags1.append(self.SmallMat)
-            MatTags1.append(self.SmallMat)
-            MatTags1.append(self.SmallMat)
+            MatTags1.append(KRxMat)
+            MatTags1.append(KRyMat)
+            MatTags1.append(KRzMat)
 
             MatTags2 = []
             self.EndMatTag += 1
@@ -1756,9 +1807,9 @@ class Builder(RC_Circular):
             else:
                 ops.uniaxialMaterial('Steel01', self.EndMatTag, Fyy[1], Ky[1], by[1])
             MatTags2.append(KvMat)
-            MatTags2.append(self.SmallMat)
-            MatTags2.append(self.SmallMat)
-            MatTags2.append(self.SmallMat)
+            MatTags2.append(KRxMat)
+            MatTags2.append(KRyMat)
+            MatTags2.append(KRzMat)
 
             # Start Abutment Coordinates
             Abut1_C = int('11' + self.ATag)  # Centroid for rigid links to bearings
@@ -1783,7 +1834,7 @@ class Builder(RC_Circular):
             ops.node(Abut1_C, *Coords1_C.tolist(), '-mass', 0, 0, 0, 0, 0, 0)
             ops.node(Abut1_CF, *Coords1_C.tolist())
             ops.node(Abut2_C, *Coords2_C.tolist(), '-mass', 0, 0, 0, 0, 0, 0)
-            ops.node(Abut2_CF, *Coords2_C.tolist(), '-mass', 0, 0, 0, 0, 0, 0)
+            ops.node(Abut2_CF, *Coords2_C.tolist())
 
             dirs = [1, 2, 3, 4, 5, 6]
             ops.element('zeroLength', int('10' + self.AbutTag), Abut1_CF, Abut1_C, '-mat', *MatTags1, '-dir', *dirs,
@@ -1830,8 +1881,8 @@ class Builder(RC_Circular):
             gap = self.model['Abutment_BackFill']['gap']
             skew1 = self.skew[0]
             skew2 = self.skew[-1]
-            # mass = h * w * b / 3  # approximate abutment mass
-            mass = 0
+            mass = h * w * b / 3  # approximate abutment mass
+            # mass = 0
 
             # # Create gap elements in longitudinal direction, if gap is a nonzero value
             # if gap != 0 and self.model['Abutment_BackFill']['gapFlag'] == 1:
@@ -1903,26 +1954,26 @@ class Builder(RC_Circular):
                 KabutL_1 = PabutL_1 / (dy_L1 + gap)
                 KabutL_2 = PabutL_2 / (dy_L2 + gap)
 
-            # Transverse Springs / CALTRANS - SDC 2019: Section 4.3.1, Figure 4.3.1-2
-            # The assumption is that sacrificial shear key is used where gap is 2 inches
-            dy_T1 = 2 * inch
-            PabutT_1 = 0.3 * self.AB1AxialForces
-            KabutT_1 = PabutT_1 / dy_T1
+            # # Transverse Springs / CALTRANS - SDC 2019: Section 4.3.1, Figure 4.3.1-2
+            # # The assumption is that sacrificial shear key is used where gap is 2 inches
+            # dy_T1 = 2 * inch
+            # PabutT_1 = 0.3 * self.AB1AxialForces
+            # KabutT_1 = PabutT_1 / dy_T1
 
-            dy_T2 = 2 * inch
-            PabutT_2 = 0.3 * self.AB2AxialForces
-            KabutT_2 = PabutT_2 / dy_T2
+            # dy_T2 = 2 * inch
+            # PabutT_2 = 0.3 * self.AB2AxialForces
+            # KabutT_2 = PabutT_2 / dy_T2
 
             # Alternatively, approach by Maroney and Chai (1994) can be followed
             # Transverse backfill pressure facator is CL*CW = 2/3*4/3 according to Maroney and Chai (1994).
-            # CL = 2 / 3  # Wingwall effectiveness coefficient
-            # CW = 4 / 3  # Wingwall participation coefficient
-            # ratio = 0.5  # The wing wall length can be assumed 1/2-1/3 of the back-wall length
-            # PabutT_1 = PabutL_1 * ratio * CL * CW
-            # KabutT_1 = KabutL_1 * ratio * CL * CW
-            # # dy_T1 = PabutT_1/KabutT_1
-            # PabutT_2 = PabutL_2 * ratio * CL * CW
-            # KabutT_2 = KabutL_2 * ratio * CL * CW
+            CL = 2 / 3  # Wingwall effectiveness coefficient
+            CW = 4 / 3  # Wingwall participation coefficient
+            ratio = 0.5  # The wing wall length can be assumed 1/2-1/3 of the back-wall length
+            PabutT_1 = PabutL_1 * ratio * CL * CW
+            KabutT_1 = KabutL_1 * ratio * CL * CW
+            # dy_T1 = PabutT_1/KabutT_1
+            PabutT_2 = PabutL_2 * ratio * CL * CW
+            KabutT_2 = KabutL_2 * ratio * CL * CW
             # dy_T2 = PabutT_2/KabutT_2
 
             if self.model['Abutment_BackFill']['spring'] == 1:
@@ -1940,9 +1991,9 @@ class Builder(RC_Circular):
                 MatTags1.append(self.EndMatTag)
                 ops.uniaxialMaterial('Steel01', self.EndMatTag, PabutT_1, KabutT_1, r)
                 MatTags1.append(KvMat)
-                MatTags1.append(self.SmallMat)
-                MatTags1.append(self.SmallMat)
-                MatTags1.append(self.SmallMat)
+                MatTags1.append(KRxMat)
+                MatTags1.append(KRyMat)
+                MatTags1.append(KRzMat)
 
                 MatTags2 = []
                 self.EndMatTag += 1
@@ -1956,9 +2007,9 @@ class Builder(RC_Circular):
                 MatTags2.append(self.EndMatTag)
                 ops.uniaxialMaterial('Steel01', self.EndMatTag, PabutT_2, KabutT_2, r)
                 MatTags2.append(KvMat)
-                MatTags2.append(self.SmallMat)
-                MatTags2.append(self.SmallMat)
-                MatTags2.append(self.SmallMat)
+                MatTags2.append(KRxMat)
+                MatTags2.append(KRyMat)
+                MatTags2.append(KRzMat)
 
                 # Start Abutment Coordinates
                 Abut1_C = int('11' + self.ATag)  # Centroid for rigid links to bearings
@@ -2025,9 +2076,9 @@ class Builder(RC_Circular):
                 MatTags1.append(self.EndMatTag)
                 ops.uniaxialMaterial('Steel01', self.EndMatTag, PabutT_1 / 2, KabutT_1 / 2, r)
                 MatTags1.append(KvMat)
-                MatTags1.append(self.SmallMat)
-                MatTags1.append(self.SmallMat)
-                MatTags1.append(self.SmallMat)
+                MatTags1.append(KRxMat)
+                MatTags1.append(KRyMat)
+                MatTags1.append(KRzMat)
 
                 MatTags2 = []
                 self.EndMatTag += 1
@@ -2041,9 +2092,9 @@ class Builder(RC_Circular):
                 MatTags2.append(self.EndMatTag)
                 ops.uniaxialMaterial('Steel01', self.EndMatTag, PabutT_2 / 2, KabutT_2 / 2, r)
                 MatTags2.append(KvMat)
-                MatTags2.append(self.SmallMat)
-                MatTags2.append(self.SmallMat)
-                MatTags2.append(self.SmallMat)
+                MatTags2.append(KRxMat)
+                MatTags2.append(KRyMat)
+                MatTags2.append(KRzMat)
 
                 # Start Abutment Coordinates
                 Abut1_C = int('10' + self.ATag)  # Centroid for rigid links
@@ -2163,11 +2214,13 @@ class Builder(RC_Circular):
             self.AbutCNodes = [Abut1_C, Abut2_C]
 
     def _foundation(self):
-        # TODO: p-y springs are not defined for liquefaction susceptible soils, t-z and q-z springs are defined
-        #  based on sand, the equations to derive qult and tult might be different for clays.
-        #  ------------------------------------------------------------------------------------------------------------
-        #  FOUNDATION MODELLING
-        #  ------------------------------------------------------------------------------------------------------------
+        """
+        --------------------------------------------
+        FOUNDATION MODELLING
+        --------------------------------------------
+        TODO: p-y springs are not defined for liquefaction susceptible soils, t-z and q-z springs are defined
+        based on sand, the equations to derive qult and tult might be different for clays.
+        """
         count1 = 0  # counter for nodes with Found1Tag
         count2 = 0  # counter for nodes with Found2Tag
         count3 = 0  # counter for nodes with Found3Tag
@@ -2311,7 +2364,7 @@ class Builder(RC_Circular):
                     ops.node(top_node, *TopCoords.tolist())
 
                 sheet = 'Abutment' + str(i + 1)
-                data = pd.read_excel(open('SoilProfiles.xlsx', 'rb'),
+                data = pd.read_excel(open(self.model['Abutment_Foundation']['file'], 'rb'),
                                      sheet_name=sheet)
                 idx = self.model['Abutment_Foundation']['Sections'][i] - 1
                 Diameter = self.model['Abutment_Foundation']['D'][idx]
@@ -2510,7 +2563,7 @@ class Builder(RC_Circular):
                 for node in node_list:
                     ops.fix(node, 1, 1, 1, 1, 1, 1)
 
-            self.fixed_BentNodes = self.BentStartNodes
+            self.fixed_BentNodes = self.BentStartNodes.copy()
 
         elif self.model['Bent_Foundation']['Type'] == 'Springs':
 
@@ -2581,7 +2634,7 @@ class Builder(RC_Circular):
                 fixed_nodes_ = []
                 Diameter = self.model['Bent_Foundation']['D'][i]
                 sheet = 'Bent' + str(i + 1)
-                data = pd.read_excel(open('SoilProfiles.xlsx', 'rb'),
+                data = pd.read_excel(open(self.model['Bent_Foundation']['file'], 'rb'),
                                      sheet_name=sheet)
                 for k in range(self.model['Bent']['N']):
                     pile_nodes = []
@@ -2760,7 +2813,7 @@ class Builder(RC_Circular):
 
                 fixed_nodes_ = []
                 sheet = 'Bent' + str(i + 1)
-                data = pd.read_excel(open('SoilProfiles.xlsx', 'rb'),
+                data = pd.read_excel(open(self.model['Bent_Foundation']['file'], 'rb'),
                                      sheet_name=sheet)
                 idx = self.model['Bent_Foundation']['Sections'][i] - 1
                 Diameter = self.model['Bent_Foundation']['D'][idx]
@@ -2936,9 +2989,8 @@ class Builder(RC_Circular):
                     fixed_nodes_.append(fixed_nodes)
                 self.fixed_BentNodes.append(fixed_nodes_)  # Fixed nodes at foundation
 
-    def _constraints(self):
 
-        # Define Rigid Links Using Rigid Elements
+    def _constraints(self):
         matTags = [self.BigMat, self.BigMat, self.BigMat, self.BigMat, self.BigMat, self.BigMat]
         dirs = [1, 2, 3, 4, 5, 6]
         RigidCount = 1
@@ -2970,7 +3022,7 @@ class Builder(RC_Circular):
                     ops.element('zeroLength', eleTag, *eleNodes, '-mat', *matTags, '-dir', *dirs)
                 else:
                     ops.rigidLink('beam', *self.RigidLinkNodes[i])
-
+    
     def _def_bent_Int(self):
         # Define sections
         if self.model['Bent']['SectionTypes'] == 'Circ':
@@ -3051,15 +3103,18 @@ class Builder(RC_Circular):
 
         return IntTags, PileWs
 
-
 def DiscretizeMember(ndI, ndJ, numEle, eleType, integrTag, transfTag, nodeTag, eleTag, Mass, MType):
-    #  ------------------------------------------------------------------------------------------------------------
-    #  DISCRETIZATION OF MEMBERS
-    #  ------------------------------------------------------------------------------------------------------------
+    """
+    ------------------------------------
+    DISCRETIZATION OF DECK MEMBERS
+    ------------------------------------
+    """
     nodeList = []
     eleList = []
     if numEle <= 1:
         ops.element(eleType, eleTag, ndI, ndJ, transfTag, integrTag, '-mass', Mass, MType)
+        eleList.append(eleTag)
+        nodeList.append(ndI)      
         return eleList, nodeList
 
     Xi = ops.nodeCoord(ndI, 'X')
@@ -3158,3 +3213,7 @@ def group_efficiency(nx, ny, sx, sy, D):
     fmy = np.mean(fmy)
 
     return fmx, fmy
+
+
+
+            

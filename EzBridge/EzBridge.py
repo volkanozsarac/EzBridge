@@ -81,10 +81,10 @@ class Main(Builder, BridgeSummary, PierInfo):
         self._get_axial_pier()
         # Build the model
         self._build()
+        self._get_CircPier_info()
 
     def get_summary(self):
         self._get_summary()
-        self._get_CircPier_info()
 
     def animation_config(self, animate, Movie, FrameStep, scale, fps):
         """
@@ -396,10 +396,10 @@ class Main(Builder, BridgeSummary, PierInfo):
 
         # SET ANALYSIS PARAMETERS
         self._config()
-        ops.test('NormDispIncr', 1e-8, 500)
-        ops.algorithm('Newton')
-        # ops.test('NormDispIncr', 1e-4, 100)
-        # ops.algorithm('KrylovNewton')
+        # ops.test('NormDispIncr', 1e-8, 500)
+        # ops.algorithm('Newton')
+        ops.test('NormDispIncr', 1e-4, 100)
+        ops.algorithm('KrylovNewton')
         # ops.test('NormDispIncr', 1e-4, 500)
         # ops.test('EnergyIncr', 1e-3, 500)
         # ops.test('NormUnbalance', 1e-4, 100)
@@ -1242,36 +1242,36 @@ class Main(Builder, BridgeSummary, PierInfo):
 
             elif self.model['Abutment_BackFill']['Type'] != 'None':
                 # Apply excitation on abutment1 nodes
-                gm_mat = th_dict['Abutment1'][0]
+                gm_mat = th_dict['Abutment1_Backfill'][0]
                 for SupportNode in self.fixed_AB1Nodes_backfill:
                     tsTag, pTag, gmTag = Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag, SupportNode)
 
                 # Apply excitation on abutment2 nodes
-                gm_mat = th_dict['Abutment2'][0]
+                gm_mat = th_dict['Abutment2_Backfill'][0]
                 for SupportNode in self.fixed_AB2Nodes_backfill:
                     tsTag, pTag, gmTag = Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag, SupportNode)
 
             if self.model['Abutment_Foundation']['Type'] == 'Springs':
                 # Apply excitation on abutment1 nodes
-                gm_mat = th_dict['Abutment1'][0]
+                gm_mat = th_dict['Abutment1_Foundation'][0]
                 for SupportNode in self.fixed_AB1Nodes_found:
                     tsTag, pTag, gmTag = Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag, SupportNode)
 
                 # Apply excitation on abutment2 nodes
-                gm_mat = th_dict['Abutment2'][0]
+                gm_mat = th_dict['Abutment2_Foundation'][0]
                 for SupportNode in self.fixed_AB2Nodes_found:
                     tsTag, pTag, gmTag = Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag, SupportNode)
 
             elif self.model['Abutment_Foundation']['Type'] == 'Group Pile':
                 count = 0
-                for gm_mat in th_dict['Abutment1']:
+                for gm_mat in th_dict['Abutment1_Foundation']:
                     for k in range((len(self.fixed_AB1Nodes_found))):
                         SupportNode = self.fixed_AB1Nodes_found[k][count]
                         tsTag, pTag, gmTag = Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag, SupportNode)
                     count += 1
 
                 count = 0
-                for gm_mat in th_dict['Abutment2']:
+                for gm_mat in th_dict['Abutment2_Foundation']:
                     for k in range((len(self.fixed_AB2Nodes_found))):
                         SupportNode = self.fixed_AB2Nodes_found[k][count]
                         tsTag, pTag, gmTag = Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag, SupportNode)
@@ -1655,33 +1655,33 @@ class Main(Builder, BridgeSummary, PierInfo):
 
                         elif self.model['Abutment_BackFill']['Type'] != 'None':
                             # Apply excitation on abutment1 nodes
-                            gm_mat = th_dict['Abutment1'][0]
+                            gm_mat = th_dict['Abutment1_Backfill'][0]
                             for SupportNode in self.fixed_AB1Nodes_backfill:
                                 tsTag, pTag, gmTag = Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag,
                                                                          SupportNode)
 
                             # Apply excitation on abutment2 nodes
-                            gm_mat = th_dict['Abutment2'][0]
+                            gm_mat = th_dict['Abutment2_Backfill'][0]
                             for SupportNode in self.fixed_AB2Nodes_backfill:
                                 tsTag, pTag, gmTag = Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag,
                                                                          SupportNode)
 
                         if self.model['Abutment_Foundation']['Type'] == 'Springs':
                             # Apply excitation on abutment1 nodes
-                            gm_mat = th_dict['Abutment1'][0]
+                            gm_mat = th_dict['Abutment1_Foundation'][0]
                             for SupportNode in self.fixed_AB1Nodes_found:
                                 tsTag, pTag, gmTag = Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag,
                                                                          SupportNode)
 
                             # Apply excitation on abutment2 nodes
-                            gm_mat = th_dict['Abutment2'][0]
+                            gm_mat = th_dict['Abutment2_Foundation'][0]
                             for SupportNode in self.fixed_AB2Nodes_found:
                                 tsTag, pTag, gmTag = Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag,
                                                                          SupportNode)
 
                         elif self.model['Abutment_Foundation']['Type'] == 'Group Pile':
                             count = 0
-                            for gm_mat in th_dict['Abutment1']:
+                            for gm_mat in th_dict['Abutment1_Foundation']:
                                 for k in range((len(self.fixed_AB1Nodes_found))):
                                     SupportNode = self.fixed_AB1Nodes_found[k][count]
                                     tsTag, pTag, gmTag = Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag,
@@ -1689,7 +1689,7 @@ class Main(Builder, BridgeSummary, PierInfo):
                                 count += 1
 
                             count = 0
-                            for gm_mat in th_dict['Abutment2']:
+                            for gm_mat in th_dict['Abutment2_Foundation']:
                                 for k in range((len(self.fixed_AB2Nodes_found))):
                                     SupportNode = self.fixed_AB2Nodes_found[k][count]
                                     tsTag, pTag, gmTag = Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag,
