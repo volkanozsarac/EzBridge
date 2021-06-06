@@ -1378,22 +1378,6 @@ class Builder(RC_Circular):
         BEARING MODELLING
         --------------------------
         """
-        # vecx = [1,0,0];  vecyp = [0,1,0]   
-        # j = 0
-        # # which one is more correct? Rigid link or equalDOF? I believe, it should be rigid link
-        # for i in range(self.num_bents):
-        #     matArgs, eleType = self._create_bearingmat(idx = i+1)
-        #     ops.node(i+1,*ops.nodeCoord(self.BentEndNodes[i][0])) # create nodes for link1, between deck bottom and pier top
-            
-        #     self.RigidLinkNodes.append([i+1, self.D1Nodes[i+1]])
-        #     if self.model['Bearing']['h'][i+1] < 1e-10:
-        #         eleArgs = [*matArgs, '-orient', *vecx, *vecyp]  # zerolength element
-        #     else:
-        #         eleArgs = [*matArgs, '-orient', *vecyp]
-            
-        #     eleNodes = [self.BentEndNodes[i][0], i+1]
-        #     eleTag = int(str(i + 1) + str(j + 1) + '0' + self.BearingTag)
-        #     ops.element(eleType, eleTag, *eleNodes, *eleArgs)
 
         # INFORMATION TO SAVE
         self.AB1Nodes = []  # Bearing bottom nodes at abutment 1
@@ -1999,7 +1983,7 @@ class Builder(RC_Circular):
                 self.EndMatTag += 1
                 MatTags2.append(self.EndMatTag)
                 if gap != 0 and self.model['Abutment_BackFill']['gapFlag'] == 1:
-                    ops.uniaxialMaterial('ElasticPPGap', self.EndMatTag, KabutL_2 / 2, -PabutL_2, -gap, 0, 'damage')
+                    ops.uniaxialMaterial('ElasticPPGap', self.EndMatTag, KabutL_2 / 2, PabutL_2, gap, 0, 'damage')
                 else:
                     ops.uniaxialMaterial('Steel01', self.EndMatTag, PabutL_2, KabutL_2, r)
 
@@ -2084,7 +2068,7 @@ class Builder(RC_Circular):
                 self.EndMatTag += 1
                 MatTags2.append(self.EndMatTag)
                 if gap != 0 and self.model['Abutment_BackFill']['gapFlag'] == 1:
-                    ops.uniaxialMaterial('ElasticPPGap', self.EndMatTag, KabutL_2 / 2, -PabutL_2, -gap, 0, 'damage')
+                    ops.uniaxialMaterial('ElasticPPGap', self.EndMatTag, KabutL_2 / 2, PabutL_2, gap, 0, 'damage')
                 else:
                     ops.uniaxialMaterial('Steel01', self.EndMatTag, PabutL_2 / 2, KabutL_2 / 2, r)
 

@@ -598,7 +598,10 @@ def nrha_single(obj, Dt, Tmax, Dc, log, pflag=0):
             # forces2.append(ops.basicForce(obj.EleIDsBearing[0][3])[2])
             # disp2.append(ops.basicDeformation(obj.EleIDsBearing[0][3])[2])
 
-            if Mdrft >= Dc: cIndex = 1; Mdrft = Dc; ops.wipe()  # Set the state of the model to local collapse (=1)
+            if Mdrft >= Dc: 
+                cIndex = 1 
+                Mdrft = Dc
+                ops.wipe()  # Set the state of the model to local collapse (=1)
 
         if pflag == 3:
             ax.clear()
@@ -606,7 +609,6 @@ def nrha_single(obj, Dt, Tmax, Dc, log, pflag=0):
             ax.text2D(0.10, 0.85, "Time: " + "{:.2f}".format(controlTime) + "/" + "{:.2f}".format(Tmax) + ' sec',
                       transform=ax.transAxes, fontweight="bold")
             plt.pause(0.001)
-
     if cIndex == -1:
         Analysis = "Analysis is FAILED to converge at %.3f of %.3f" % (controlTime, Tmax)
     if cIndex == 0:
