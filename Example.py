@@ -45,25 +45,25 @@ inputs = {
         'h': [0 * cm, 0 *cm, 0 *cm, 0 *cm, 0 *cm],  # height of bearings
         's': [1310 * mm, 1310 * mm, 1310 * mm, 1310 * mm, 1310 * mm],  # spacing of bearings (if more than 1)
 
-        # # Distributed bearing approach
-        # 'N': [10, 10, 10, 10, 10],  # underneath each span end
-        # 'Type': ['Elastic', 'Elastic', 'Elastic', 'Elastic', 'Elastic'],  # Type of bearing
-        # 'kx': [1755 * kN / m, 1755 * kN / m, 1755 * kN / m, 1755 * kN / m, 1755 * kN / m],
-        # 'ky': [1e8 * kN / m, 1e8 * kN / m, 1e8 * kN / m, 1e8 * kN / m, 1e8 * kN / m],
-        # 'kz': [1143752 * kN / m, 1143752 * kN / m, 1143752 * kN / m, 1143752 * kN / m, 1143752 * kN / m],
-        # 'krx': [10 * kN / m, 10 * kN / m, 10 * kN / m, 10 * kN / m, 10 * kN / m],
-        # 'kry': [10 * kN / m, 10 * kN / m, 10 * kN / m, 10 * kN / m, 10 * kN / m],
-        # 'krz': [10 * kN / m, 10 * kN / m, 10 * kN / m, 10 * kN / m, 10 * kN / m]
+        # Distributed bearing approach
+        'N': [10, 10, 10, 10, 10],  # underneath each span end
+        'Type': ['Elastic', 'Elastic', 'Elastic', 'Elastic', 'Elastic'],  # Type of bearing
+        'kx': [1755 * kN / m, 1755 * kN / m, 1755 * kN / m, 1755 * kN / m, 1755 * kN / m],
+        'ky': [1e8 * kN / m, 1e8 * kN / m, 1e8 * kN / m, 1e8 * kN / m, 1e8 * kN / m],
+        'kz': [1143752 * kN / m, 1143752 * kN / m, 1143752 * kN / m, 1143752 * kN / m, 1143752 * kN / m],
+        'krx': [10 * kN / m, 10 * kN / m, 10 * kN / m, 10 * kN / m, 10 * kN / m],
+        'kry': [10 * kN / m, 10 * kN / m, 10 * kN / m, 10 * kN / m, 10 * kN / m],
+        'krz': [10 * kN / m, 10 * kN / m, 10 * kN / m, 10 * kN / m, 10 * kN / m]
 
         # Lumped bearing approach
-        'N': [1, 1, 1, 1, 1],
-        'Type': ['Elastic', 'Elastic', 'Elastic', 'Elastic', 'Elastic'],
-        'kx': [10 * 1755 * kN / m, 10 * 1755 * kN / m, 10 * 1755 * kN / m, 10 * 1755 * kN / m, 10 * 1755 * kN / m],
-        'ky': [1e8 * kN / m, 1e8 * kN / m, 1e8 * kN / m, 1e8 * kN / m, 1e8 * kN / m],
-        'kz': [10 * 51200 * kN / m, 10 * 51200 * kN / m, 10 * 51200 * kN / m, 10 * 51200 * kN / m, 10 * 51200 * kN / m],
-        'krx': [1e10 * kN / m, 1e10 * kN / m, 1e10 * kN / m, 1e10 * kN / m, 1e10 * kN / m],
-        'kry': [10 * kN / m, 10 * kN / m, 10 * kN / m, 10 * kN / m, 10 * kN / m],
-        'krz': [1e10 * kN / m, 1e10 * kN / m, 1e10 * kN / m, 1e10 * kN / m, 1e10 * kN / m]
+        # 'N': [1, 1, 1, 1, 1],
+        # 'Type': ['Elastic', 'Elastic', 'Elastic', 'Elastic', 'Elastic'],
+        # 'kx': [10 * 1755 * kN / m, 10 * 1755 * kN / m, 10 * 1755 * kN / m, 10 * 1755 * kN / m, 10 * 1755 * kN / m],
+        # 'ky': [1e8 * kN / m, 1e8 * kN / m, 1e8 * kN / m, 1e8 * kN / m, 1e8 * kN / m],
+        # 'kz': [10 * 51200 * kN / m, 10 * 51200 * kN / m, 10 * 51200 * kN / m, 10 * 51200 * kN / m, 10 * 51200 * kN / m],
+        # 'krx': [1e10 * kN / m, 1e10 * kN / m, 1e10 * kN / m, 1e10 * kN / m, 1e10 * kN / m],
+        # 'kry': [10 * kN / m, 10 * kN / m, 10 * kN / m, 10 * kN / m, 10 * kN / m],
+        # 'krz': [1e10 * kN / m, 1e10 * kN / m, 1e10 * kN / m, 1e10 * kN / m, 1e10 * kN / m]
 
         # This is like assigning a release
         # 'N': [1, 1, 1, 1, 1],
@@ -177,6 +177,8 @@ inputs = {
 
         'Type': 'Group Pile',  # Foundation Type (Fixed, Macro elements, Pile-Shaft, Group Pile)
         'file': 'SoilProfiles.xlsx', # Name of the excel file where soil info is saved
+        'py_Mat': 'PySimple1', # material for p-y springs ('PySimple1', 'NonGapping_MultiLinear')
+        'tz_qz': 1,  # Use tz_qz springs if 1, use pinned base if 0
         'EleType': 0,
         # 0: Displacement-Based Beam column element with elastic section
         # 1: Displacement-Based Beam column element with inelastic fiber section
@@ -216,6 +218,9 @@ inputs = {
         # 'Krz': [50000.00e3*kN/m, 50000.00e3*kN/m, 50000.00e3*kN/m]   #  Elastic Spring Property, -dof rZ
 
         # 'Type': 'Pile-Shaft',  # Foundation Type (Fixed, Macro elements, Pile-Shaft, Group Pile)
+        # 'file': 'SoilProfiles.xlsx', # Name of the excel file where soil info is saved
+        # 'py_Mat': 'PySimple1', # material for p-y springs ('PySimple1', 'NonGapping_MultiLinear')
+        # 'tz_qz': 1,  # Use tz_qz springs if 1, use pinned base if 0
         # 'EleType': 0,  # 0: Displacement-Based Beam column element with elastic section
         # # 1: Displacement-Based Beam column element with inelastic fiber section
         # # - Gauss Legendre with 2 gauss points
@@ -236,6 +241,8 @@ inputs = {
 
         'Type': 'Group Pile',  # Foundation Type (Fixed, Macro elements, Pile-Shaft, Group Pile)
         'file': 'SoilProfiles.xlsx', # Name of the excel file where soil info is saved
+        'py_Mat': 'PySimple1', # material for p-y springs ('PySimple1', 'NonGapping_MultiLinear')
+        'tz_qz': 1,  # Use tz_qz springs if 1, use pinned base if 0
         'EleType': 0,
         # 0: Displacement-Based Beam column element with elastic section
         # 1: Displacement-Based Beam column element with inelastic fiber section
@@ -260,7 +267,7 @@ inputs = {
         'ny': [2, 2, 2],  # number of rows in y dir
         'sx': [3 * m, 3 * m, 3 * m],  # spacing in x dir
         'sy': [3 * m, 3 * m, 3 * m],  # spacing in y dir
-        'Group Effect': 1
+        'Group Effect': 1 # lower pult to include group effect for piles
     }
 }
     

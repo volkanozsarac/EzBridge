@@ -13,7 +13,7 @@ import numpy as np
 import openseespy.opensees as ops
 from scipy import interpolate
 
-def plot_sec(obj):
+def plot_sec(obj, save):
     num_sec = len(set(obj.model['Bent']['Sections']))
     for i in range(num_sec):
         D = obj.model['Bent']['D'][i]  # Section diameter
@@ -25,7 +25,7 @@ def plot_sec(obj):
         yC, zC, startAng, endAng, ri, ro, nfCoreR, nfCoreT, nfCoverR, nfCoverT = obj._circ_fiber_config(D)
         rc = ro - cc
         barRplotfactor = 1
-        # filename = os.path.join('Outputs','FiberSections','section'+str(SecTag)+".png")
+        filename = os.path.join(obj.out_dir,'section'+str(secTag)+".png")
         plt.figure()
         plot_patchcirc(yC, zC, nfCoverT, nfCoverR, rc, ro, startAng, endAng, 'lightgrey')  # unconfined concrete
         plot_patchcirc(yC, zC, nfCoreT, nfCoreR, ri, rc, startAng, endAng, 'grey')  # confined concrete
@@ -36,7 +36,8 @@ def plot_sec(obj):
         plt.xlabel('z-coord (m)')
         plt.ylabel('y-coord (m)')
         plt.show()
-        # plt.savefig(filename,bbox_inches='tight')
+        if save == 1:
+            plt.savefig(filename,bbox_inches='tight')
 
     if obj.model['Bent_Foundation']['Type'] in ['Pile-Shaft', 'Group Pile'] and obj.model['Bent_Foundation']['EleType'] in [1, 2]:
         num_sec = len(set(obj.model['Bent_Foundation']['Sections']))
@@ -50,7 +51,7 @@ def plot_sec(obj):
             yC, zC, startAng, endAng, ri, ro, nfCoreR, nfCoreT, nfCoverR, nfCoverT = obj._circ_fiber_config(D)
             rc = ro - cc
             barRplotfactor = 1
-            # filename = os.path.join('Outputs','FiberSections','section'+str(SecTag)+".png")
+            filename = os.path.join(obj.out_dir,'section'+str(secTag)+".png")
             plt.figure()
             plot_patchcirc(yC, zC, nfCoverT, nfCoverR, rc, ro, startAng, endAng, 'lightgrey')  # unconfined concrete
             plot_patchcirc(yC, zC, nfCoreT, nfCoreR, ri, rc, startAng, endAng, 'grey')  # confined concrete
@@ -61,7 +62,8 @@ def plot_sec(obj):
             plt.xlabel('z-coord (m)')
             plt.ylabel('y-coord (m)')
             plt.show()
-            # plt.savefig(filename,bbox_inches='tight')
+            if save == 1:
+                plt.savefig(filename,bbox_inches='tight')
 
 def plot_patchcirc(yC, zC, nfp, nft, intR, extR, startAng, endAng, mcolor):
     # yC, zC: y & z-coordinates of the center of the circle

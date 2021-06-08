@@ -161,13 +161,13 @@ class Main(Builder, BridgeSummary, PierInfo):
         """
         Rendering.plot_modeshape(self, modeNumber, scale)
 
-    def plot_sections(self):
+    def plot_sections(self, save = 0):
         """
         ---------------------------
         PIER CROSS SECTION PLOTTING
         ---------------------------
         """
-        Rendering.plot_sec(self)
+        Rendering.plot_sec(self, save)
 
     def plot_deformedshape(self, ax=None, scale=5):
         """
@@ -396,10 +396,10 @@ class Main(Builder, BridgeSummary, PierInfo):
 
         # SET ANALYSIS PARAMETERS
         self._config()
-        # ops.test('NormDispIncr', 1e-8, 500)
-        # ops.algorithm('Newton')
-        ops.test('NormDispIncr', 1e-4, 100)
-        ops.algorithm('KrylovNewton')
+        ops.test('NormDispIncr', 1e-8, 500)
+        ops.algorithm('Newton')
+        # ops.test('NormDispIncr', 1e-4, 100)
+        # ops.algorithm('KrylovNewton')
         # ops.test('NormDispIncr', 1e-4, 500)
         # ops.test('EnergyIncr', 1e-3, 500)
         # ops.test('NormUnbalance', 1e-4, 100)

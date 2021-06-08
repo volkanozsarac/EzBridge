@@ -746,7 +746,7 @@ def nrha_multiple(obj, Dt, Tmax, Dc, log, pflag=0):
     # Run the actual analysis now
     while cIndex == 0 and controlTime <= Tmax and ok == 0:
         # Set the default analysis parameters
-        ops.integrator('HHT', alpha)  # Hail Mary... Bless the analysis with thy damping!
+        # ops.integrator('HHT', alpha)  # Hail Mary... Bless the analysis with thy damping!
         ops.integrator('Newmark', gamma, beta)
         ops.test(testType, tolInit, iterInit)
         ops.algorithm(algorithmType)
@@ -762,8 +762,8 @@ def nrha_multiple(obj, Dt, Tmax, Dc, log, pflag=0):
         k = 0  # counter for the integrators
         while k < 2 and ok != 0:
             if k == 1:
-                ops.integrator('Newmark', gamma, beta)
-                # ops.integrator('HHT', alpha)  # Hail Mary... Bless the analysis with thy damping!
+                # ops.integrator('Newmark', gamma, beta)
+                ops.integrator('HHT', alpha)  # Hail Mary... Bless the analysis with thy damping!
                 print(" ~~~ Changing integrator to Hilber-Hughes-Taylor (HHT) from Newmark at %.2f......" % controlTime)
             # First changes are to change algorithm to achieve convergence...
             if ok != 0:

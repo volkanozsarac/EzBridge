@@ -953,7 +953,7 @@ class Builder(RC_Circular):
         ops.beamIntegration('Legendre', self.BigInt, self.BigSec, 2)
         ops.section('Elastic', self.SmallSec, 1e-5, 1, 1, 1, 1e-5, 1)
         ops.beamIntegration('Legendre', self.SmallInt, self.SmallSec, 2)
-        ops.uniaxialMaterial('Elastic', self.SmallMat, 1e-5)
+        ops.uniaxialMaterial('Elastic', self.SmallMat, 10)
         ops.uniaxialMaterial('Elastic', self.ZeroMat, 0)
         ops.uniaxialMaterial('Elastic', self.bigMat, 1e8)
 
@@ -2387,12 +2387,15 @@ class Builder(RC_Circular):
                         cu = data['Undrained Shear Strength'][j]
                         eps50 = data['Eps50'][j]
                         Gsoil = data['Gsoil'][j]
+                        Cd = 0.3  # Variable that sets the drag resistance within a fully-mobilized gap as Cd*pult.
+                        # (0.3 is a recommended value) Reference: Boulanger et al. 1999
                         pEleLength = hlayer
                         rho = gamma / g
                         Area = pEleLength * Diameter
                         Vs = (Gsoil / rho) ** 0.5
                         Vp = 1.87 * Vs
                         v = (Vp + Vs) / 2
+                        # Radiation Damping
                         c = rho * Area * (Vs + v)  # The viscous damping term (dashpot) on the far-field
                         # (elastic) component of the displacement rate (velocity).
                         # (optional Default = 0.0). Nonzero c values are used
@@ -2402,8 +2405,6 @@ class Builder(RC_Circular):
                         # where A=Diameter*DeltaZ(or element length)
                         # Yet, ideally, this term is frequency dependent, Gazetas and Dobry 1984
                         # Let's make use of the approach by Berger, Mahin & Pyke 1977 for piles
-                        Cd = 0.3  # Variable that sets the drag resistance within a fully-mobilized gap as Cd*pult.
-                        # (0.3 is a recommended value) Reference: Boulanger et al. 1999
 
                         if 'clay' in soil:
                             soilType = 1
@@ -2449,55 +2450,72 @@ class Builder(RC_Circular):
                         elif soilType == 2:
                             y50, pult, strain_stress = get_pyParam_sand(pyDepth, sigV, phiDegree, Diameter, pEleLength,
                                                                         LSwitch=1)
-                        # Direction 1
-                        self.EndMatTag += 1
-                        # # Use PySimple1 Material
-                        ops.uniaxialMaterial('PySimple1', self.EndMatTag, soilType, pult * fm1, y50, Cd, c)
-                        # Use MultiLinear Material
-                        # strain_stress[np.arange(1, len(strain_stress), 2).tolist()] = \
-                        #     strain_stress[np.arange(1, len(strain_stress), 2).tolist()] * fm1
-                        # ops.uniaxialMaterial('MultiLinear', self.EndMatTag, *strain_stress)
-                        # Add small stiffness value to avoid zero stiffness
-                        self.EndMatTag += 1
-                        ops.uniaxialMaterial('Parallel', self.EndMatTag, self.EndMatTag - 1, self.SmallMat)
-                        matTags = [self.EndMatTag]
-
-                        # Direction 2
-                        self.EndMatTag += 1
-                        # # Use PySimple1 Material
-                        ops.uniaxialMaterial('PySimple1', self.EndMatTag, soilType, pult * fm2, y50, Cd, c)
-                        # Use MultiLinear Material
-                        # strain_stress[np.arange(1, len(strain_stress), 2).tolist()] = \
-                        #     strain_stress[np.arange(1, len(strain_stress), 2).tolist()] * fm2 / fm1
-                        # ops.uniaxialMaterial('MultiLinear', self.EndMatTag, *strain_stress)
-                        # To avoid zero stiffness values
-                        self.EndMatTag += 1
-                        ops.uniaxialMaterial('Parallel', self.EndMatTag, self.EndMatTag - 1, self.SmallMat)
-                        matTags.append(self.EndMatTag)
+                        # Define P-Y Mats in dir 1 and 2
                         dirs = [1, 2]
 
-                        ## !!! Comment this part if you do not want to consider vertical springs
-                        # vertical effective stress at current depth
-                        sigV = gamma * pyDepth
-                        self.EndMatTag += 1
-                        # I am not sure if this makes sense for clays, but ok
-                        if j == len(data['Layer ID']) - 1:  # q-z spring
-                            z50, qult = get_qzParam(phiDegree, Diameter, sigV, Gsoil)
-                            ops.uniaxialMaterial('QzSimple1', self.EndMatTag, soilType, qult, z50)
-                        else:  # t-z spring
-                            z50, tult = get_tzParam(phiDegree, Diameter, sigV, pEleLength)
-                            ops.uniaxialMaterial('TzSimple1', self.EndMatTag, soilType, tult, z50, 0.0)
-                        matTags.append(self.EndMatTag)
-                        dirs.append(3)
+                        if self.model['Abutment_Foundation']['py_Mat'] == 'PySimple1':
+                            # Using PySimple1 Material
+                            # Direction 1
+                            self.EndMatTag += 1
+                            ops.uniaxialMaterial('PySimple1', self.EndMatTag, soilType, pult * fm1, y50, Cd, c)
+                            # To avoid zero stiffness values
+                            self.EndMatTag += 1
+                            ops.uniaxialMaterial('Parallel', self.EndMatTag, self.EndMatTag - 1, self.SmallMat)
+                            matTags = [self.EndMatTag]
 
-                        # # !!! Uncomment this part if restraint is assigned instead of vertical springs at the bottom
-                        # if j == len(data['Layer ID']) - 1:
-                        #     ops.fix(node_pile, 0, 0, 1, 0, 0, 0)
-                        #     fixed_nodes.append(node_pile)
-                        #     if i == 0:
-                        #         self.fixed_AB1Nodes.append(node_pile) # Fixed nodes at foundation
-                        #     elif i == 1:
-                        #         self.fixed_AB2Nodes.append(node_pile)
+                            # Direction 2
+                            self.EndMatTag += 1
+                            ops.uniaxialMaterial('PySimple1', self.EndMatTag, soilType, pult * fm2, y50, Cd, c)
+                            # To avoid zero stiffness values
+                            self.EndMatTag += 1
+                            ops.uniaxialMaterial('Parallel', self.EndMatTag, self.EndMatTag - 1, self.SmallMat)
+                            matTags.append(self.EndMatTag)
+                         
+                        elif self.model['Abutment_Foundation']['py_Mat'] == 'NonGapping_MultiLinear':
+                            # Using MultiLinear Material  
+                            # Direction 1
+                            self.EndMatTag += 1
+                            strain_stress[np.arange(1, len(strain_stress), 2).tolist()] = \
+                                strain_stress[np.arange(1, len(strain_stress), 2).tolist()] * fm1
+                            ops.uniaxialMaterial('MultiLinear', self.EndMatTag, *strain_stress)
+                            # Add small stiffness value to avoid zero stiffness
+                            self.EndMatTag += 1
+                            ops.uniaxialMaterial('Parallel', self.EndMatTag, self.EndMatTag - 1, self.SmallMat)
+                            matTags = [self.EndMatTag]
+
+                            # Direction 2
+                            self.EndMatTag += 1
+                            strain_stress[np.arange(1, len(strain_stress), 2).tolist()] = \
+                                strain_stress[np.arange(1, len(strain_stress), 2).tolist()] * fm2 / fm1
+                            ops.uniaxialMaterial('MultiLinear', self.EndMatTag, *strain_stress)
+                            # To avoid zero stiffness values
+                            self.EndMatTag += 1
+                            ops.uniaxialMaterial('Parallel', self.EndMatTag, self.EndMatTag - 1, self.SmallMat)
+                            matTags.append(self.EndMatTag)
+
+                        if self.model['Abutment_Foundation']['tz_qz'] == 1:
+                            # Consider vertical springs
+                            # vertical effective stress at current depth
+                            self.EndMatTag += 1
+                            # I am not sure if this makes sense for clays, but ok
+                            if j == len(data['Layer ID']) - 1:  # q-z spring
+                                z50, qult = get_qzParam(phiDegree, Diameter, sigV, Gsoil)
+                                ops.uniaxialMaterial('QzSimple1', self.EndMatTag, soilType, qult, z50)
+                            else:  # t-z spring
+                                z50, tult = get_tzParam(phiDegree, Diameter, sigV, pEleLength)
+                                ops.uniaxialMaterial('TzSimple1', self.EndMatTag, soilType, tult, z50, 0.0)
+                            matTags.append(self.EndMatTag)
+                            dirs.append(3)
+
+                        else:
+                            # Restraint is assigned instead of vertical springs at the bottom
+                            if j == len(data['Layer ID']) - 1:
+                                ops.fix(node_pile, 0, 0, 1, 0, 0, 0)
+                                fixed_nodes.append(node_pile)
+                                if i == 0:
+                                    self.fixed_AB1Nodes.append(node_pile) # Fixed nodes at foundation
+                                elif i == 1:
+                                    self.fixed_AB2Nodes.append(node_pile)
 
                         count5 += 1
                         eletag = int(str(count5) + self.SpringEleTag)
@@ -2638,6 +2656,8 @@ class Builder(RC_Circular):
                         cu = data['Undrained Shear Strength'][j]
                         eps50 = data['Eps50'][j]
                         Gsoil = data['Gsoil'][j]
+                        Cd = 0.3  # Variable that sets the drag resistance within a fully-mobilized gap as Cd*pult.
+                        # (0.3 is a recommended value) Reference: Boulanger et al. 1999
                         pEleLength = hlayer
                         rho = gamma / g
                         Area = pEleLength * Diameter
@@ -2653,8 +2673,6 @@ class Builder(RC_Circular):
                         # where A=Diameter*DeltaZ(or element length)
                         # Yet, ideally, this term is frequency dependent, Gazetas and Dobry 1984
                         # Let's make use of the approach by Berger, Mahin & Pyke 1977 for piles
-                        Cd = 0.3  # Variable that sets the drag resistance within a fully-mobilized gap as Cd*pult.
-                        # (0.3 is a recommended value) Reference: Boulanger et al. 1999
 
                         if 'clay' in soil:
                             soilType = 1
@@ -2693,36 +2711,46 @@ class Builder(RC_Circular):
                         elif soilType == 2:
                             y50, pult, strain_stress = get_pyParam_sand(pyDepth, sigV, phiDegree, Diameter, pEleLength,
                                                                         LSwitch=1)
-
-                        self.EndMatTag += 1
-                        # Use PySimple1 Material
-                        ops.uniaxialMaterial('PySimple1', self.EndMatTag, soilType, pult, y50, Cd, c)
-                        # # Use MultiLinear Material
-                        # ops.uniaxialMaterial('MultiLinear', self.EndMatTag, *strain_stress)
-                        # To avoid zero stiffness values
-                        self.EndMatTag += 1
-                        ops.uniaxialMaterial('Parallel', self.EndMatTag, self.EndMatTag - 1, self.SmallMat)
-                        matTags = [self.EndMatTag, self.EndMatTag]
+                        # Define P-Y Mats in dir 1 and 2
                         dirs = [1, 2]
 
-                        # !!! Comment this part if you do not want to consider vertical springs
-                        # vertical effective stress at current depth
-                        sigV = gamma * pyDepth
-                        self.EndMatTag += 1
-                        # I am not sure if this makes sense for clays, but ok
-                        if j == len(data['Layer ID']) - 1:  # q-z spring
-                            z50, qult = get_qzParam(phiDegree, Diameter, sigV, Gsoil)
-                            ops.uniaxialMaterial('QzSimple1', self.EndMatTag, soilType, qult, z50)
-                        else:  # t-z spring
-                            z50, tult = get_tzParam(phiDegree, Diameter, sigV, pEleLength)
-                            ops.uniaxialMaterial('TzSimple1', self.EndMatTag, soilType, tult, z50, 0.0)
-                        matTags.append(self.EndMatTag)
-                        dirs.append(3)
+                        if self.model['Bent_Foundation']['py_Mat'] == 'PySimple1':
+                            # Using PySimple1 Material
+                            self.EndMatTag += 1
+                            ops.uniaxialMaterial('PySimple1', self.EndMatTag, soilType, pult, y50, Cd, c)
+                            # To avoid zero stiffness values
+                            self.EndMatTag += 1
+                            ops.uniaxialMaterial('Parallel', self.EndMatTag, self.EndMatTag - 1, self.SmallMat)
+                            matTags = [self.EndMatTag, self.EndMatTag]
+                         
+                        elif self.model['Bent_Foundation']['py_Mat'] == 'NonGapping_MultiLinear':
+                            # Using MultiLinear Material  
+                            self.EndMatTag += 1
+                            ops.uniaxialMaterial('MultiLinear', self.EndMatTag, *strain_stress)
+                            # To avoid zero stiffness values
+                            self.EndMatTag += 1
+                            ops.uniaxialMaterial('Parallel', self.EndMatTag, self.EndMatTag - 1, self.SmallMat)
+                            matTags = [self.EndMatTag, self.EndMatTag]
 
-                        # # !!! Uncomment this part if restraint is assigned instead of vertical springs at the bottom
-                        # if j == len(data['Layer ID']) - 1:
-                        #     ops.fix(node_pile, 0, 0, 1, 0, 0, 0)
-                        #     fixed_nodes.append(node_pile)
+                        if self.model['Bent_Foundation']['tz_qz'] == 1:
+                            # Consider vertical springs
+                            # vertical effective stress at current depth
+                            self.EndMatTag += 1
+                            # I am not sure if this makes sense for clays, but ok
+                            if j == len(data['Layer ID']) - 1:  # q-z spring
+                                z50, qult = get_qzParam(phiDegree, Diameter, sigV, Gsoil)
+                                ops.uniaxialMaterial('QzSimple1', self.EndMatTag, soilType, qult, z50)
+                            else:  # t-z spring
+                                z50, tult = get_tzParam(phiDegree, Diameter, sigV, pEleLength)
+                                ops.uniaxialMaterial('TzSimple1', self.EndMatTag, soilType, tult, z50, 0.0)
+                            matTags.append(self.EndMatTag)
+                            dirs.append(3)
+
+                        else:
+                            # Restraint is assigned instead of vertical springs at the bottom
+                            if j == len(data['Layer ID']) - 1:
+                                ops.fix(node_pile, 0, 0, 1, 0, 0, 0)
+                                fixed_nodes.append(node_pile)
 
                         count5 += 1
                         eletag = int(str(count5) + self.SpringEleTag)
@@ -2836,6 +2864,8 @@ class Builder(RC_Circular):
                         cu = data['Undrained Shear Strength'][j]
                         eps50 = data['Eps50'][j]
                         Gsoil = data['Gsoil'][j]
+                        Cd = 0.3  # Variable that sets the drag resistance within a fully-mobilized gap as Cd*pult.
+                        # (0.3 is a recommended value) Reference: Boulanger et al. 1999
                         pEleLength = hlayer
                         rho = gamma / g
                         Area = pEleLength * Diameter
@@ -2851,8 +2881,6 @@ class Builder(RC_Circular):
                         # where A=Diameter*DeltaZ(or element length)
                         # Yet, ideally, this term is frequency dependent, Gazetas and Dobry 1984
                         # Let's make use of the approach by Berger, Mahin & Pyke 1977 for piles
-                        Cd = 0.3  # Variable that sets the drag resistance within a fully-mobilized gap as Cd*pult.
-                        # (0.3 is a recommended value) Reference: Boulanger et al. 1999
 
                         if 'clay' in soil:
                             soilType = 1
@@ -2892,48 +2920,68 @@ class Builder(RC_Circular):
                             y50, pult, strain_stress = get_pyParam_sand(pyDepth, sigV, phiDegree, Diameter, pEleLength,
                                                                         LSwitch=1)
 
-                        # Direction 1
-                        self.EndMatTag += 1
-                        # Use PySimple1 Material
-                        ops.uniaxialMaterial('PySimple1', self.EndMatTag, soilType, pult * fm1, y50, Cd, c)
-                        # Use MultiLinear Material
-                        # strain_stress[np.arange(1,len(strain_stress),2).tolist()] = strain_stress[np.arange(1,len(strain_stress),2).tolist()]* fm1
-                        # ops.uniaxialMaterial('MultiLinear', self.EndMatTag, *strain_stress)
-                        # Add small stiffness value to avoid zero stiffness
-                        self.EndMatTag += 1
-                        ops.uniaxialMaterial('Parallel', self.EndMatTag, self.EndMatTag - 1, self.SmallMat)
-                        matTags = [self.EndMatTag]
-
-                        # Direction 2
-                        self.EndMatTag += 1
-                        # Use PySimple1 Material
-                        ops.uniaxialMaterial('PySimple1', self.EndMatTag, soilType, pult * fm2, y50, Cd, c)
-                        # # Use MultiLinear Material
-                        # strain_stress[np.arange(1,len(strain_stress),2).tolist()] = strain_stress[np.arange(1,len(strain_stress),2).tolist()]* fm2/fm1
-                        # ops.uniaxialMaterial('MultiLinear', self.EndMatTag, *strain_stress)
-                        # # To avoid zero stiffness values
-                        self.EndMatTag += 1
-                        ops.uniaxialMaterial('Parallel', self.EndMatTag, self.EndMatTag - 1, self.SmallMat)
-                        matTags.append(self.EndMatTag)
+                        # Define P-Y Mats in dir 1 and 2
                         dirs = [1, 2]
 
-                        ## !!! Comment this part if you do not want to consider vertical springs
-                        # vertical effective stress at current depth
-                        self.EndMatTag += 1
-                        # I am not sure if this makes sense for clays, but ok
-                        if j == len(data['Layer ID']) - 1:  # q-z spring
-                            z50, qult = get_qzParam(phiDegree, Diameter, sigV, Gsoil)
-                            ops.uniaxialMaterial('QzSimple1', self.EndMatTag, soilType, qult, z50)
-                        else:  # t-z spring
-                            z50, tult = get_tzParam(phiDegree, Diameter, sigV, pEleLength)
-                            ops.uniaxialMaterial('TzSimple1', self.EndMatTag, soilType, tult, z50, 0.0)
-                        matTags.append(self.EndMatTag)
-                        dirs.append(3)
+                        if self.model['Bent_Foundation']['py_Mat'] == 'PySimple1':
+                            # Using PySimple1 Material
+                            # Direction 1
+                            self.EndMatTag += 1
+                            ops.uniaxialMaterial('PySimple1', self.EndMatTag, soilType, pult * fm1, y50, Cd, c)
+                            # To avoid zero stiffness values
+                            self.EndMatTag += 1
+                            ops.uniaxialMaterial('Parallel', self.EndMatTag, self.EndMatTag - 1, self.SmallMat)
+                            matTags = [self.EndMatTag]
 
-                        # # !!! Uncomment this part if restraint is assigned instead of vertical springs at the bottom
-                        # if j == len(data['Layer ID']) - 1:
-                        #     ops.fix(node_pile, 0, 0, 1, 0, 0, 0)
-                        #     fixed_nodes.append(node_pile)
+                            # Direction 2
+                            self.EndMatTag += 1
+                            ops.uniaxialMaterial('PySimple1', self.EndMatTag, soilType, pult * fm2, y50, Cd, c)
+                            # To avoid zero stiffness values
+                            self.EndMatTag += 1
+                            ops.uniaxialMaterial('Parallel', self.EndMatTag, self.EndMatTag - 1, self.SmallMat)
+                            matTags.append(self.EndMatTag)
+                         
+                        elif self.model['Bent_Foundation']['py_Mat'] == 'NonGapping_MultiLinear':
+                            # Using MultiLinear Material  
+                            # Direction 1
+                            self.EndMatTag += 1
+                            strain_stress[np.arange(1, len(strain_stress), 2).tolist()] = \
+                                strain_stress[np.arange(1, len(strain_stress), 2).tolist()] * fm1
+                            ops.uniaxialMaterial('MultiLinear', self.EndMatTag, *strain_stress)
+                            # Add small stiffness value to avoid zero stiffness
+                            self.EndMatTag += 1
+                            ops.uniaxialMaterial('Parallel', self.EndMatTag, self.EndMatTag - 1, self.SmallMat)
+                            matTags = [self.EndMatTag]
+
+                            # Direction 2
+                            self.EndMatTag += 1
+                            strain_stress[np.arange(1, len(strain_stress), 2).tolist()] = \
+                                strain_stress[np.arange(1, len(strain_stress), 2).tolist()] * fm2 / fm1
+                            ops.uniaxialMaterial('MultiLinear', self.EndMatTag, *strain_stress)
+                            # To avoid zero stiffness values
+                            self.EndMatTag += 1
+                            ops.uniaxialMaterial('Parallel', self.EndMatTag, self.EndMatTag - 1, self.SmallMat)
+                            matTags.append(self.EndMatTag)
+
+                        if self.model['Bent_Foundation']['tz_qz'] == 1:
+                            # Consider vertical springs
+                            # vertical effective stress at current depth
+                            self.EndMatTag += 1
+                            # I am not sure if this makes sense for clays, but ok
+                            if j == len(data['Layer ID']) - 1:  # q-z spring
+                                z50, qult = get_qzParam(phiDegree, Diameter, sigV, Gsoil)
+                                ops.uniaxialMaterial('QzSimple1', self.EndMatTag, soilType, qult, z50)
+                            else:  # t-z spring
+                                z50, tult = get_tzParam(phiDegree, Diameter, sigV, pEleLength)
+                                ops.uniaxialMaterial('TzSimple1', self.EndMatTag, soilType, tult, z50, 0.0)
+                            matTags.append(self.EndMatTag)
+                            dirs.append(3)
+
+                        else:
+                            # Restraint is assigned instead of vertical springs at the bottom
+                            if j == len(data['Layer ID']) - 1:
+                                ops.fix(node_pile, 0, 0, 1, 0, 0, 0)
+                                fixed_nodes.append(node_pile)
 
                         count5 += 1
                         eletag = int(str(count5) + self.SpringEleTag)

@@ -526,7 +526,7 @@ class BridgeSummary:
             DPiles = []
             PileLengths = []
             for i in range(self.num_bents):
-                data = pd.read_excel(open('SoilProfiles.xlsx', 'rb'),
+                data = pd.read_excel(open(self.model['Bent_Foundation']['file'], 'rb'),
                                      sheet_name='Bent' + str(i + 1))
                 PileLengths.append(np.sum(data['Thickness'])*self.model['Bent']['N'])
                 idx = self.model['Bent_Foundation']['Sections'][i]-1
@@ -542,7 +542,7 @@ class BridgeSummary:
             DPiles = []
             PileLengths = []
             for i in range(self.num_bents):
-                data = pd.read_excel(open('SoilProfiles.xlsx', 'rb'),
+                data = pd.read_excel(open(self.model['Bent_Foundation']['file'], 'rb'),
                                      sheet_name='Bent' + str(i + 1))
                 PileLengths.append(np.sum(data['Thickness'])*self.model['Bent_Foundation']['nx'][idx]*self.model['Bent_Foundation']['ny'][idx])
                 idx = self.model['Bent_Foundation']['Sections'][i]-1
