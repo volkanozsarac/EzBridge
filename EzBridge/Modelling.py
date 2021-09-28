@@ -3,6 +3,7 @@ import openseespy.opensees as ops
 import sys
 from scipy.interpolate import interp1d
 import pandas as pd
+import matplotlib.pyplot as plt
 
 from .Utility import distance, getRectProp, getCircProp, def_units
 from .Utility import get_pyParam_sand, get_pyParam_clay, get_tzParam, get_qzParam
@@ -62,7 +63,7 @@ class RC_Circular:
             idx = self.model['Bent']['Sections'][i] - 1
             D = self.model['Bent']['D'][idx]  # Section diameter
             Fce = self.model['Bent']['Fce'][idx]  # Concrete compressive strength
-            E = 5000 * MPa * (Fce / MPa) ** 0.5  # Concrete Elastic Modulus
+            E = 5000 * MPa * (Fce / MPa) ** 0.5  # Concrete Elastic Modulus from mander et al. 1988
             G = E / (2 * (1 + 0.2))  # Concrete Elastic Shear Modulus
             A, Iy, Iz, J = getCircProp(D)  # Mechanical properties
             self.EndSecTag += 1
@@ -95,8 +96,8 @@ class RC_Circular:
                                          TransReinfType, P, Fce / MPa, Fyle / MPa,
                                          Fyhe / MPa, Lpl1)
                 Ke = param1[0]
-                Iye = Ke / (E * Iy) * Iy
-                Ize = Ke / (E * Iz) * Iz
+                Iye = Ke / E # This should be different for each direction if section is not circular
+                Ize = Ke / E # This should be different for each direction if section is not circular
 
                 if self.model['Bent']['EleType'] == 1:
                     ops.section('Elastic', self.EndSecTag, E, A, Ize, Iye, G, J)
@@ -278,9 +279,9 @@ class RC_Circular:
         # # recommended parameters by OpenSees webpage, concrete02 and concrete01
         # # unconfined concrete compressive strength Properties
         # fc1U = -Fce                        # UNCONFINED concrete (todeschini parabolic model), maximum stress
-        # eps1U = -0.003                    # strain at maximum strength of unconfined concrete
-        # fc2U = 0.01*fc1U                   # ultimate stress
-        # eps2U = -0.01                     # spalling strain
+        # eps1U = -0.002                    # strain at maximum strength of unconfined concrete
+        # fc2U = 0.0*fc1U                   # ultimate stress
+        # eps2U = -0.006                     # spalling strain
         # # confined concrete compressive strength Properties
         # fc1C = Kfc*fc1U                   # CONFINED concrete strength
         # eps1C = 2*fc1C/Ec                 # strain at maximum stress 
@@ -288,27 +289,25 @@ class RC_Circular:
         # eps2C = 5*eps1C                   # strain at ultimate stress
         # # Tensile-Strength Properties
         # # Lambda = 0.1                      # ratio between unloading slope at $eps2 and initial slope $Ec
-        # # fctU = -0.14*fc1U      # tensile strength of unconfined concrete
-        # # fctC = -0.14*fc1C      # tensile strength of confined concrete
-        # # Ets = fctU/0.002                    # tension softening stiffness
-        # # Generate Materials, modified kent-park model
-        # # ops.uniaxialMaterial('Concrete02', coverID, fc1U, eps1U ,fc2U, eps2U,Lambda,fctU,Ets)    # build cover concrete (unconfined)
-        # # ops.uniaxialMaterial('Concrete02', coreID, fc1C, eps1C, fc2C, eps2C,Lambda,fctC,Ets)     # build core concrete (confined)
+        # # fct = 0.56 * MPa * (Fce / MPa) ** 0.5      # tensile strength of confined concrete
+        # # Ets = fct/0.002                    # tension softening stiffness
+        # # # Generate Materials, modified kent-park model
+        # # ops.uniaxialMaterial('Concrete02', coverID, fc1U, eps1U ,fc2U, eps2U,Lambda,fct,Ets)    # build cover concrete (unconfined)
+        # # ops.uniaxialMaterial('Concrete02', coreID, fc1C, eps1C, fc2C, eps2C,Lambda,fct,Ets)     # build core concrete (confined)
         # ops.uniaxialMaterial('Concrete01', coverID, fc1U, eps1U ,fc2U, eps2U)    # build cover concrete (unconfined)
         # ops.uniaxialMaterial('Concrete01', coreID, fc1C, eps1C, fc2C, eps2C)     # build core concrete (confined)
-        # # print('Concrete01', coreID, fc1C, eps1C, fc2C, eps2C)
         
         # recommended parameters by Mander Model, concrete04
         # unconfined concrete compressive strength Properties
         fc1U = -Fce  # UNCONFINED concrete (todeschini parabolic model), maximum stress
         eps1U = -0.002  # strain at maximum strength of unconfined concrete
-        eps2U = -0.005  # spalling strain
+        eps2U = -0.006  # spalling strain
         # confined concrete compressive strength Properties
         fc1C = Kfc * fc1U  # CONFINED concrete strength
         eps1C = eps1U * (1 + 5 * (fc1C / fc1U - 1))  # strain at maximum stress
         epssm = 0.10  # max transv. steel strain (usually ~0.10-0.15)*
-        eps2C = -(0.004 + 1.4 * ps * Fyhe * epssm / (-fc1C))  # strain at ultimate stress
-        # eps2C = -1.5 * (0.004 + 1.4 * ps * Fyhe * epssm / (-fc1C))  # 1.5 is recommended by Kowalsky
+        # eps2C = -(0.004 + 1.4 * ps * Fyhe * epssm / (-fc1C))  # strain at ultimate stress
+        eps2C = -1.5 * (0.004 + 1.4 * ps * Fyhe * epssm / (-fc1C))  # 1.5 is recommended by Kowalsky, this equation is very conservative
 
         # Tensile-Strength Properties
         fct = 0.56 * MPa * (Fce / MPa) ** 0.5
@@ -340,6 +339,7 @@ class RC_Circular:
         maxStrain = 0.1  # maximum steel strain in the fibers (steel rupture)
         # Generate Materials
         ops.uniaxialMaterial('Steel02', steelID, Fyle, Es, Bs, R0, cR1, cR2)
+        # ops.uniaxialMaterial('Steel01', steelID, Fyle, Es, Bs)
         ops.uniaxialMaterial('MinMax', MinMaxID, steelID, '-min', minStrain, '-max', maxStrain)
 
         ######### DEFINE SECTIONS #########
@@ -356,7 +356,8 @@ class RC_Circular:
         SecTag = self.EndSecTag + 1
         self.EndSecTag += 1
         ops.section('Aggregator', self.EndSecTag, ShearID, 'Vy', ShearID, 'Vz', '-section', self.EndSecTag - 1)
-
+        
+    # TODO:-1 try to create opensees based MPhi analysis
     @staticmethod
     def _Circ_MPhi(D, cc, nbl, Dbl, s, Dh, stype, P, fpc, fsy, fyhe, Lpl):
         """
@@ -806,6 +807,7 @@ class RC_Circular:
         # plt.xticks([],[])
         # plt.yticks([],[])
         # plt.savefig('MPhi.pdf', format = 'pdf', bbox_inches = 'tight', facecolor = None)
+        # plt.close(fig)
 
         # --------------------------------------
         # Compute Stiffness Deterioration
@@ -944,13 +946,15 @@ class Builder(RC_Circular):
         self.SmallMat = 2
         self.ZeroMat = 3
         self.bigMat = 4
+        self.RigidTransfTag = 1
         self.EndMatTag = 4
         self.EndSecTag = 2
         self.EndIntTag = 2
-        self.EndTransfTag = 0
-        ops.uniaxialMaterial('Elastic', self.BigMat, 1e14)
-        ops.section('Elastic', self.BigSec, 1e14, 1, 1, 1, 1e14, 1)
+        self.EndTransfTag = 1
+        ops.uniaxialMaterial('Elastic', self.BigMat, 1e16)
+        ops.section('Elastic', self.BigSec, 1e16, 1, 1, 1, 1e16, 1)
         ops.beamIntegration('Legendre', self.BigInt, self.BigSec, 2)
+        ops.geomTransf('Linear', self.RigidTransfTag, 1, 0, 0)
         ops.section('Elastic', self.SmallSec, 1e-5, 1, 1, 1, 1e-5, 1)
         ops.beamIntegration('Legendre', self.SmallInt, self.SmallSec, 2)
         ops.uniaxialMaterial('Elastic', self.SmallMat, 10)
@@ -2306,7 +2310,9 @@ class Builder(RC_Circular):
 
             # Define integration schemes for pile elements
             IntTags, PileWs = self._def_pile_Int('Abutment')
-
+            GWTs = pd.read_excel(open(self.model['Abutment_Foundation']['file'], 'rb'),
+                                     sheet_name='Water Table')
+                
             self.fixed_AB1Nodes_found = []
             self.fixed_AB2Nodes_found = []
             self.EleIDsPY_Abut = []  # PY spring element IDs
@@ -2350,6 +2356,7 @@ class Builder(RC_Circular):
                 sheet = 'Abutment' + str(i + 1)
                 data = pd.read_excel(open(self.model['Abutment_Foundation']['file'], 'rb'),
                                      sheet_name=sheet)
+                gwtDepth = GWTs[sheet][0]
                 idx = self.model['Abutment_Foundation']['Sections'][i] - 1
                 Diameter = self.model['Abutment_Foundation']['D'][idx]
                 nx = self.model['Abutment_Foundation']['nx'][i]
@@ -2425,7 +2432,14 @@ class Builder(RC_Circular):
                         coords[2] = coords[2] - hlayer / 2
                         pyDepth += hlayer / 2
                         sigV += gamma * hlayer / 2
-
+                        # Effective unit weight
+                        if gwtDepth =='-' or pyDepth <= gwtDepth: # '-' means very deep
+                            sigV_eff = sigV
+                            gwtSwitch=1
+                        else:
+                            sigV_eff = sigV - 10*(pyDepth-gwtDepth)
+                            gwtSwitch=2
+                            
                         count1 += 1
                         count3 += 1
                         node_fixed = int(str(count1) + self.Found1Tag)
@@ -2442,14 +2456,12 @@ class Builder(RC_Circular):
                             self.fixed_AB2Nodes.append(node_fixed)
 
                         # P-y springs
-                        # TODO: gwtSwitch = 2 if the soil is below ground water
-                        #  properties change sigV = sigV - 10*|PyDepth-gwtDepth|
                         if soilType == 1:
-                            y50, pult, strain_stress = get_pyParam_clay(pyDepth, sigV, cu, eps50, Diameter, pEleLength,
+                            y50, pult, strain_stress = get_pyParam_clay(pyDepth, sigV_eff, cu, eps50, Diameter, pEleLength,
                                                                         soil)
                         elif soilType == 2:
-                            y50, pult, strain_stress = get_pyParam_sand(pyDepth, sigV, phiDegree, Diameter, pEleLength,
-                                                                        LSwitch=1)
+                            y50, pult, strain_stress = get_pyParam_sand(pyDepth, sigV_eff, phiDegree, Diameter, pEleLength,
+                                                                        LSwitch=1, puSwitch=1, kSwitch=2, gwtSwitch=gwtSwitch)
                         # Define P-Y Mats in dir 1 and 2
                         dirs = [1, 2]
 
@@ -2459,16 +2471,16 @@ class Builder(RC_Circular):
                             self.EndMatTag += 1
                             ops.uniaxialMaterial('PySimple1', self.EndMatTag, soilType, pult * fm1, y50, Cd, c)
                             # To avoid zero stiffness values
-                            self.EndMatTag += 1
-                            ops.uniaxialMaterial('Parallel', self.EndMatTag, self.EndMatTag - 1, self.SmallMat)
+                            # self.EndMatTag += 1
+                            # ops.uniaxialMaterial('Parallel', self.EndMatTag, self.EndMatTag - 1, self.SmallMat)
                             matTags = [self.EndMatTag]
 
                             # Direction 2
                             self.EndMatTag += 1
                             ops.uniaxialMaterial('PySimple1', self.EndMatTag, soilType, pult * fm2, y50, Cd, c)
                             # To avoid zero stiffness values
-                            self.EndMatTag += 1
-                            ops.uniaxialMaterial('Parallel', self.EndMatTag, self.EndMatTag - 1, self.SmallMat)
+                            # self.EndMatTag += 1
+                            # ops.uniaxialMaterial('Parallel', self.EndMatTag, self.EndMatTag - 1, self.SmallMat)
                             matTags.append(self.EndMatTag)
                          
                         elif self.model['Abutment_Foundation']['py_Mat'] == 'NonGapping_MultiLinear':
@@ -2479,8 +2491,8 @@ class Builder(RC_Circular):
                                 strain_stress[np.arange(1, len(strain_stress), 2).tolist()] * fm1
                             ops.uniaxialMaterial('MultiLinear', self.EndMatTag, *strain_stress)
                             # Add small stiffness value to avoid zero stiffness
-                            self.EndMatTag += 1
-                            ops.uniaxialMaterial('Parallel', self.EndMatTag, self.EndMatTag - 1, self.SmallMat)
+                            # self.EndMatTag += 1
+                            # ops.uniaxialMaterial('Parallel', self.EndMatTag, self.EndMatTag - 1, self.SmallMat)
                             matTags = [self.EndMatTag]
 
                             # Direction 2
@@ -2489,8 +2501,8 @@ class Builder(RC_Circular):
                                 strain_stress[np.arange(1, len(strain_stress), 2).tolist()] * fm2 / fm1
                             ops.uniaxialMaterial('MultiLinear', self.EndMatTag, *strain_stress)
                             # To avoid zero stiffness values
-                            self.EndMatTag += 1
-                            ops.uniaxialMaterial('Parallel', self.EndMatTag, self.EndMatTag - 1, self.SmallMat)
+                            # self.EndMatTag += 1
+                            # ops.uniaxialMaterial('Parallel', self.EndMatTag, self.EndMatTag - 1, self.SmallMat)
                             matTags.append(self.EndMatTag)
 
                         if self.model['Abutment_Foundation']['tz_qz'] == 1:
@@ -2499,10 +2511,10 @@ class Builder(RC_Circular):
                             self.EndMatTag += 1
                             # I am not sure if this makes sense for clays, but ok
                             if j == len(data['Layer ID']) - 1:  # q-z spring
-                                z50, qult = get_qzParam(phiDegree, Diameter, sigV, Gsoil)
+                                z50, qult = get_qzParam(phiDegree, Diameter, sigV_eff, Gsoil)
                                 ops.uniaxialMaterial('QzSimple1', self.EndMatTag, soilType, qult, z50)
                             else:  # t-z spring
-                                z50, tult = get_tzParam(phiDegree, Diameter, sigV, pEleLength)
+                                z50, tult = get_tzParam(phiDegree, Diameter, sigV_eff, pEleLength)
                                 ops.uniaxialMaterial('TzSimple1', self.EndMatTag, soilType, tult, z50, 0.0)
                             matTags.append(self.EndMatTag)
                             dirs.append(3)
@@ -2631,6 +2643,8 @@ class Builder(RC_Circular):
             self.EleLoadsPile = []  # Pile element Loads
 
             IntTags, PileWs = self._def_pile_Int('Bent')
+            GWTs = pd.read_excel(open(self.model['Bent_Foundation']['file'], 'rb'),
+                                 sheet_name='Water Table')
 
             for i in range(self.num_bents):
                 fixed_nodes_ = []
@@ -2638,6 +2652,8 @@ class Builder(RC_Circular):
                 sheet = 'Bent' + str(i + 1)
                 data = pd.read_excel(open(self.model['Bent_Foundation']['file'], 'rb'),
                                      sheet_name=sheet)
+                gwtDepth = GWTs[sheet][0]
+                
                 for k in range(self.model['Bent']['N']):
                     pile_nodes = []
                     fixed_nodes = []
@@ -2690,6 +2706,13 @@ class Builder(RC_Circular):
                         coords[2] = coords[2] - hlayer / 2
                         pyDepth += hlayer / 2
                         sigV += gamma * hlayer / 2
+                        # Effective unit weight
+                        if gwtDepth =='-' or pyDepth <= gwtDepth: # '-' means very deep
+                            sigV_eff = sigV
+                            gwtSwitch=1
+                        else:
+                            sigV_eff = sigV - 10*(pyDepth-gwtDepth)
+                            gwtSwitch=2
 
                         count1 += 1
                         count3 += 1
@@ -2703,14 +2726,12 @@ class Builder(RC_Circular):
                         fixed_nodes.append(node_fixed)
 
                         # P-y springs
-                        # TODO: gwtSwitch = 2 if the soil is below ground water
-                        #  properties change sigV = sigV - 10*|PyDepth-gwtDepth|
                         if soilType == 1:
-                            y50, pult, strain_stress = get_pyParam_clay(pyDepth, sigV, cu, eps50, Diameter, pEleLength,
+                            y50, pult, strain_stress = get_pyParam_clay(pyDepth, sigV_eff, cu, eps50, Diameter, pEleLength,
                                                                         soil)
                         elif soilType == 2:
-                            y50, pult, strain_stress = get_pyParam_sand(pyDepth, sigV, phiDegree, Diameter, pEleLength,
-                                                                        LSwitch=1)
+                            y50, pult, strain_stress = get_pyParam_sand(pyDepth, sigV_eff, phiDegree, Diameter, pEleLength,
+                                                                        LSwitch=1, puSwitch=1, kSwitch=2, gwtSwitch=gwtSwitch)
                         # Define P-Y Mats in dir 1 and 2
                         dirs = [1, 2]
 
@@ -2719,8 +2740,8 @@ class Builder(RC_Circular):
                             self.EndMatTag += 1
                             ops.uniaxialMaterial('PySimple1', self.EndMatTag, soilType, pult, y50, Cd, c)
                             # To avoid zero stiffness values
-                            self.EndMatTag += 1
-                            ops.uniaxialMaterial('Parallel', self.EndMatTag, self.EndMatTag - 1, self.SmallMat)
+                            # self.EndMatTag += 1
+                            # ops.uniaxialMaterial('Parallel', self.EndMatTag, self.EndMatTag - 1, self.SmallMat)
                             matTags = [self.EndMatTag, self.EndMatTag]
                          
                         elif self.model['Bent_Foundation']['py_Mat'] == 'NonGapping_MultiLinear':
@@ -2728,8 +2749,8 @@ class Builder(RC_Circular):
                             self.EndMatTag += 1
                             ops.uniaxialMaterial('MultiLinear', self.EndMatTag, *strain_stress)
                             # To avoid zero stiffness values
-                            self.EndMatTag += 1
-                            ops.uniaxialMaterial('Parallel', self.EndMatTag, self.EndMatTag - 1, self.SmallMat)
+                            # self.EndMatTag += 1
+                            # ops.uniaxialMaterial('Parallel', self.EndMatTag, self.EndMatTag - 1, self.SmallMat)
                             matTags = [self.EndMatTag, self.EndMatTag]
 
                         if self.model['Bent_Foundation']['tz_qz'] == 1:
@@ -2738,10 +2759,10 @@ class Builder(RC_Circular):
                             self.EndMatTag += 1
                             # I am not sure if this makes sense for clays, but ok
                             if j == len(data['Layer ID']) - 1:  # q-z spring
-                                z50, qult = get_qzParam(phiDegree, Diameter, sigV, Gsoil)
+                                z50, qult = get_qzParam(phiDegree, Diameter, sigV_eff, Gsoil)
                                 ops.uniaxialMaterial('QzSimple1', self.EndMatTag, soilType, qult, z50)
                             else:  # t-z spring
-                                z50, tult = get_tzParam(phiDegree, Diameter, sigV, pEleLength)
+                                z50, tult = get_tzParam(phiDegree, Diameter, sigV_eff, pEleLength)
                                 ops.uniaxialMaterial('TzSimple1', self.EndMatTag, soilType, tult, z50, 0.0)
                             matTags.append(self.EndMatTag)
                             dirs.append(3)
@@ -2805,6 +2826,8 @@ class Builder(RC_Circular):
 
             # Define integration schemes for pile elements
             IntTags, PileWs = self._def_pile_Int('Bent')
+            GWTs = pd.read_excel(open(self.model['Bent_Foundation']['file'], 'rb'),
+                                 sheet_name='Water Table')
 
             for i in range(self.num_bents):
                 cap_coords = np.zeros(3)
@@ -2833,6 +2856,7 @@ class Builder(RC_Circular):
                 ny = self.model['Bent_Foundation']['ny'][i]
                 sx = self.model['Bent_Foundation']['sx'][i]
                 sy = self.model['Bent_Foundation']['sy'][i]
+                gwtDepth = GWTs[sheet][0]
                 if self.model['Bent_Foundation']['Group Effect'] == 1:
                     fm1, fm2 = group_efficiency(nx, ny, sx, sy, Diameter)
                 else:
@@ -2900,6 +2924,13 @@ class Builder(RC_Circular):
                         coords[2] = coords[2] - hlayer / 2
                         pyDepth += hlayer / 2
                         sigV += gamma * hlayer / 2
+                        # Effective unit weight
+                        if gwtDepth =='-' or pyDepth <= gwtDepth: # '-' means very deep
+                            sigV_eff = sigV
+                            gwtSwitch=1
+                        else:
+                            sigV_eff = sigV - 10*(pyDepth-gwtDepth)
+                            gwtSwitch=2
 
                         node_fixed = int(str(count1) + self.Found1Tag)
                         node_pile = int(str(count3) + self.Found3Tag)
@@ -2911,14 +2942,12 @@ class Builder(RC_Circular):
                         fixed_nodes.append(node_fixed)
 
                         # P-y springs
-                        # TODO: gwtSwitch = 2 if the soil is below ground water
-                        #  properties change sigV = sigV - 10*|PyDepth-gwtDepth|
                         if soilType == 1:
-                            y50, pult, strain_stress = get_pyParam_clay(pyDepth, sigV, cu, eps50, Diameter, pEleLength,
+                            y50, pult, strain_stress = get_pyParam_clay(pyDepth, sigV_eff, cu, eps50, Diameter, pEleLength,
                                                                         soil)
                         elif soilType == 2:
-                            y50, pult, strain_stress = get_pyParam_sand(pyDepth, sigV, phiDegree, Diameter, pEleLength,
-                                                                        LSwitch=1)
+                            y50, pult, strain_stress = get_pyParam_sand(pyDepth, sigV_eff, phiDegree, Diameter, pEleLength,
+                                                                        LSwitch=1, puSwitch=1, kSwitch=2, gwtSwitch=gwtSwitch)
 
                         # Define P-Y Mats in dir 1 and 2
                         dirs = [1, 2]
@@ -2929,16 +2958,16 @@ class Builder(RC_Circular):
                             self.EndMatTag += 1
                             ops.uniaxialMaterial('PySimple1', self.EndMatTag, soilType, pult * fm1, y50, Cd, c)
                             # To avoid zero stiffness values
-                            self.EndMatTag += 1
-                            ops.uniaxialMaterial('Parallel', self.EndMatTag, self.EndMatTag - 1, self.SmallMat)
+                            # self.EndMatTag += 1
+                            # ops.uniaxialMaterial('Parallel', self.EndMatTag, self.EndMatTag - 1, self.SmallMat)
                             matTags = [self.EndMatTag]
 
                             # Direction 2
                             self.EndMatTag += 1
                             ops.uniaxialMaterial('PySimple1', self.EndMatTag, soilType, pult * fm2, y50, Cd, c)
                             # To avoid zero stiffness values
-                            self.EndMatTag += 1
-                            ops.uniaxialMaterial('Parallel', self.EndMatTag, self.EndMatTag - 1, self.SmallMat)
+                            # self.EndMatTag += 1
+                            # ops.uniaxialMaterial('Parallel', self.EndMatTag, self.EndMatTag - 1, self.SmallMat)
                             matTags.append(self.EndMatTag)
                          
                         elif self.model['Bent_Foundation']['py_Mat'] == 'NonGapping_MultiLinear':
@@ -2949,8 +2978,8 @@ class Builder(RC_Circular):
                                 strain_stress[np.arange(1, len(strain_stress), 2).tolist()] * fm1
                             ops.uniaxialMaterial('MultiLinear', self.EndMatTag, *strain_stress)
                             # Add small stiffness value to avoid zero stiffness
-                            self.EndMatTag += 1
-                            ops.uniaxialMaterial('Parallel', self.EndMatTag, self.EndMatTag - 1, self.SmallMat)
+                            # self.EndMatTag += 1
+                            # ops.uniaxialMaterial('Parallel', self.EndMatTag, self.EndMatTag - 1, self.SmallMat)
                             matTags = [self.EndMatTag]
 
                             # Direction 2
@@ -2959,8 +2988,8 @@ class Builder(RC_Circular):
                                 strain_stress[np.arange(1, len(strain_stress), 2).tolist()] * fm2 / fm1
                             ops.uniaxialMaterial('MultiLinear', self.EndMatTag, *strain_stress)
                             # To avoid zero stiffness values
-                            self.EndMatTag += 1
-                            ops.uniaxialMaterial('Parallel', self.EndMatTag, self.EndMatTag - 1, self.SmallMat)
+                            # self.EndMatTag += 1
+                            # ops.uniaxialMaterial('Parallel', self.EndMatTag, self.EndMatTag - 1, self.SmallMat)
                             matTags.append(self.EndMatTag)
 
                         if self.model['Bent_Foundation']['tz_qz'] == 1:
@@ -2969,10 +2998,10 @@ class Builder(RC_Circular):
                             self.EndMatTag += 1
                             # I am not sure if this makes sense for clays, but ok
                             if j == len(data['Layer ID']) - 1:  # q-z spring
-                                z50, qult = get_qzParam(phiDegree, Diameter, sigV, Gsoil)
+                                z50, qult = get_qzParam(phiDegree, Diameter, sigV_eff, Gsoil)
                                 ops.uniaxialMaterial('QzSimple1', self.EndMatTag, soilType, qult, z50)
                             else:  # t-z spring
-                                z50, tult = get_tzParam(phiDegree, Diameter, sigV, pEleLength)
+                                z50, tult = get_tzParam(phiDegree, Diameter, sigV_eff, pEleLength)
                                 ops.uniaxialMaterial('TzSimple1', self.EndMatTag, soilType, tult, z50, 0.0)
                             matTags.append(self.EndMatTag)
                             dirs.append(3)
@@ -3029,8 +3058,6 @@ class Builder(RC_Circular):
 
         # Use beam column elements with very high stiffness
         if self.const_opt == 1:
-            self.EndTransfTag += 1
-            ops.geomTransf('Linear', self.EndTransfTag, 1, 0, 0)
             for i in range(len(self.RigidLinkNodes)):
                 eleTag = int(str(RigidCount) + self.RigidTag)
                 RigidCount += 1
@@ -3040,7 +3067,7 @@ class Builder(RC_Circular):
                 if (coords1 == coords2).all():
                     ops.element('zeroLength', eleTag, *eleNodes, '-mat', *matTags, '-dir', *dirs)
                 else:
-                    ops.element('dispBeamColumn', eleTag, *eleNodes, self.EndTransfTag, self.BigInt)
+                    ops.element('dispBeamColumn', eleTag, *eleNodes, self.RigidTransfTag, self.BigInt)
 
         # Use rigid link constraints                    
         else:

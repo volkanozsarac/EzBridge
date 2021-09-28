@@ -2,20 +2,28 @@ import openseespy.opensees as ops
 import os
 import numpy as np
 
-def user(obj):    
+def user(obj, out_dir):    
     
     # ops.recorder('Node', '-file',  'disp1.txt', '-time', '-node', obj.D1Nodes[1], '-dof', 1,2, 'disp')
+    for bent in range(len(obj.EleIDsPY)):
+        for ele in obj.EleIDsPY[bent]:
+            force_name = os.path.join(out_dir,str(bent+1)+'_'+str(ele)+'_Force_py.txt')
+            disp_name = os.path.join(out_dir,str(bent+1)+'_'+str(ele)+'_Disp_py.txt')
+
+            ops.recorder('Element', '-file',  force_name, '-time', '-ele', ele, 'forces')
+            ops.recorder('Element', '-file',  disp_name, '-time', '-ele', ele, 'deformation')
+        
     # eleNodes = ops.eleNodes(obj.EleIDsPY[0][5])
     # ops.recorder('Element', '-file',  'eleForce_py.txt', '-time', '-ele', obj.EleIDsPY[0][5], 'forces')
     # ops.recorder('Element', '-file',  'eleDisp_py.txt', '-time', '-ele', obj.EleIDsPY[0][5], 'deformation')
     
-    ops.recorder('Element', '-file',  'eleForce_Gap1.txt', '-time', '-ele', obj.EleIDsGap[0][3], 'localForce')
-    ops.recorder('Element', '-file',  'eleDisp_Gap1.txt', '-time', '-ele', obj.EleIDsGap[0][3], 'deformation')
+    # ops.recorder('Element', '-file',  'eleForce_Gap1.txt', '-time', '-ele', obj.EleIDsGap[0][3], 'localForce')
+    # ops.recorder('Element', '-file',  'eleDisp_Gap1.txt', '-time', '-ele', obj.EleIDsGap[0][3], 'deformation')
 
-    ops.recorder('Element', '-file',  'eleForce_AB1R.txt', '-time', '-ele', obj.EleIDsAB1[0], 'forces')
-    ops.recorder('Element', '-file',  'eleDisp_AB1R.txt', '-time', '-ele', obj.EleIDsAB1[0], 'deformation')
-    ops.recorder('Element', '-file',  'eleForce_AB2R.txt', '-time', '-ele', obj.EleIDsAB2[0], 'forces')
-    ops.recorder('Element', '-file',  'eleDisp_AB2R.txt', '-time', '-ele', obj.EleIDsAB2[0], 'deformation')
+    # ops.recorder('Element', '-file',  'eleForce_AB1R.txt', '-time', '-ele', obj.EleIDsAB1[0], 'forces')
+    # ops.recorder('Element', '-file',  'eleDisp_AB1R.txt', '-time', '-ele', obj.EleIDsAB1[0], 'deformation')
+    # ops.recorder('Element', '-file',  'eleForce_AB2R.txt', '-time', '-ele', obj.EleIDsAB2[0], 'forces')
+    # ops.recorder('Element', '-file',  'eleDisp_AB2R.txt', '-time', '-ele', obj.EleIDsAB2[0], 'deformation')
 
     
     ops.record()

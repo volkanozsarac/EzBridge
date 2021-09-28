@@ -418,20 +418,56 @@ def nrha_single(obj, Dt, Tmax, Dc, log, pflag=0):
     if pflag == 3:  # plotting option
         plt.figure(figsize=(19.2, 10.8))
         ax = plt.subplot(1, 1, 1, projection='3d')
-        scale = 40
-
+        scale = 40                      
+                      
+    algorithms = [
+        ['Newton', '-initial'],
+        ['KrylovNewton'],  
+        ['ModifiedNewton', '-initial'],
+        ['NewtonLineSearch', '-InitialInterpolated', 0.8], 
+        ['Broyden', 8]
+                ]
+    
     # Define the Initial Analysis Parameters
     testType = 'NormDispIncr'  # Set the initial test type (default)
     tolInit = 1.0e-6  # Set the initial Tolerance, so it can be referred back to (default)
-    iterInit = 50  # Set the initial Max Number of Iterations (default)
-    algorithmType = 'KrylovNewton'  # Set the initial algorithm type (default)
-    # Parameters required in Newmark Integrator
-    gamma = 0.5
-    beta = 0.25  # gamma = 1/2, beta = 1/4 --> Average Acceleration Method; # gamma = 1/2, beta = 1/6 --> Linear
-    # Acceleration Method;
+    iterInit = 20  # Set the initial Max Number of Iterations (default)
+    
+    # Parameters required in Newmark Integrator, no numerical dissiaption
+    # gamma = 1/2, beta = 1/4 --> Average Acceleration Method; unconditionally stable
+    # gamma = 1/2, beta = 1/6 --> Linear Acceleration Method; conditionally stable dt/T <0.551
+    # gamma = 0.5
+    # beta = 0.25
+    # ops.integrator('Newmark', gamma, beta)
+
+    # Hail Mary... Bless the analysis with thy damping!
     # Parameters required in Hilber-Hughes-Taylor (HHT) integrator
-    alpha = 0.85  # alpha = 1.0 = Newmark Method. smaller alpha means greater numerical damping. 0.67<alpha<1.0
-    # recommended. Leave beta and gamma as default for unconditional stability.
+    # alpha = 1.0 = Newmark Method. smaller alpha means greater numerical damping. 
+    # 0.67<alpha<1.0 # recommended. Leave beta and gamma as default for unconditional stability.
+    # alpha = 0.8
+    # ops.integrator('HHT', alpha)
+
+    # Parameters for GeneralizedAlpha integrator.
+    # alphaF and alphaM are defined differently that in the paper, we use alpha_F = (1-alpha_f) and 
+    # alpha_M=(1-alpha_m) where alpha_f and alpha_m are those used in the paper.
+    # 1. Like Newmark and all the implicit schemes, the unconditional stability of this method 
+    # applies to linear problems. There are no results showing stability of this method over the
+    # wide range of nonlinear problems that potentially exist. Experience indicates that the time 
+    # step for implicit schemes in nonlinear situations can be much greater than those for explicit schemes.
+    # 2. alphaM = 1.0, alphaF = 1.0 produces the Newmark Method.
+    # 3. alphaM = 1.0 corresponds to the HHT method.
+    # 4. The method is second-order accurate provided gamma=0.5+alphaM-alphaF, beta=(1+alphaM-alphaF)**2/4
+    # These are optional parameters that can be used, but default values satisfy this condition
+    # 5. The method is unconditionally stable provided alphaM >= alphaF >= 0.5, beta >= 0.25+0.5*(alphaM-alphaF)
+    # The following relationships minimize low-frequency damping and maximize high-frequency damping
+    # pinf = 1 no dissipation of high frequency response 
+    # pinf = 0 annihilation of high-frequency response
+    pinf = 0.4
+    alpha_m = (2*pinf-1)/(pinf+1)
+    alpha_f = pinf/(1+pinf)
+    alphaM = 1-alpha_m
+    alphaF = 1-alpha_f
+    ops.integrator('GeneralizedAlpha', alphaM, alphaF)
 
     # Set up analysis parameters
     cIndex = 0  # Initially define the control index (-1 for non-converged, 0 for stable, 1 for global collapse)
@@ -439,6 +475,7 @@ def nrha_single(obj, Dt, Tmax, Dc, log, pflag=0):
     ok = 0  # Set the convergence to 0 (initially converged)
     mflr = 0  # Set the initial pier collapse location
     Mdrft = 0.0  # Set initially the maximum of all pier drifts (SRSS)
+    Dtt = Dt/1 # analysis time step
 
     # Set up the pier drift and acceleration values
     h = []
@@ -476,97 +513,62 @@ def nrha_single(obj, Dt, Tmax, Dc, log, pflag=0):
 
     # Run the actual analysis now
     while cIndex == 0 and controlTime <= Tmax and ok == 0:
-        # Set the default analysis parameters
-        ops.integrator('Newmark', gamma, beta)
-        ops.test(testType, tolInit, iterInit)
-        ops.algorithm(algorithmType)
+        ops.test(testType, tolInit, iterInit, 0, 2)
+        ops.algorithm(*algorithms[0])
         ops.analysis('Transient')
 
+        # Gradually increase the time increment size
+        if Dtt == Dt/4:
+            Dtt = Dt/2
+        elif Dtt == Dt/2:
+            Dtt = Dt/1
+
         # Do the analysis
-        ok = ops.analyze(1, Dt)  # Run a step of the analysis
+        ok = ops.analyze(1, Dtt)  # Run a step of the analysis
         controlTime = ops.getTime()  # Update the control time
-        if pflag == 2: print("Completed %.2f of %.2f seconds" % (controlTime, Tmax))
+        if pflag > 1: print("Completed %.2f of %.2f seconds" % (controlTime, Tmax))
 
         # If the analysis fails, try the following changes to achieve convergence
         # Analysis will be slower in here though...
-        k = 0  # counter for the integrators
-        while k < 2 and ok != 0:
-            if k == 1:
-                ops.integrator('HHT', alpha)  # Hail Mary... Bless the analysis with thy damping!
-                print(" ~~~ Changing integrator to Hilber-Hughes-Taylor (HHT) from Newmark at %.2f......" % controlTime)
-            # First changes are to change algorithm to achieve convergence...
-            if ok != 0:
-                print(" ~~~ Failed at %.2f - Reduced timestep by half......" % controlTime)
-                Dtt = 0.5 * Dt
+        
+        # Reduce analysis the time increment size
+        if ok != 0 and Dtt>Dt/2:
+            print(" ~~~ Failed at %.2f - Reduced timestep by half..." % controlTime)
+            Dtt = Dt/2
+            ok = ops.analyze(1, Dtt)
+            if ok == 0:
+                print(' ~~~ The reduced timestep has worked ', Dtt)
+
+        if ok != 0 and Dtt>Dt/4:
+            print(" ~~~ Failed at %.2f - Reduced timestep by quarter..." % controlTime)
+            Dtt = Dt/4
+            ok = ops.analyze(1, Dtt)
+            if ok == 0:
+                print(' ~~~ The reduced timestep has worked: ', Dtt)       
+
+        # Change the solution algorithm
+        if ok != 0:
+            ops.test(testType, iterInit*5, 0, 2) # lets increase the number of iterations for other algorithms than regular newton
+            for algorithmType in algorithms[1:]:
+                print(" ~~~ Failed at %.2f - Moving to the next algorithm..." % controlTime)
+                ops.algorithm(*algorithmType)
                 ok = ops.analyze(1, Dtt)
-
-            if ok != 0:
-                print(" ~~~ Failed at %.2f - Reduced timestep by quarter......" % controlTime)
-                Dtt = 0.25 * Dt
+                if ok == 0:
+                    print('The algorithm has worked: ', algorithmType)
+                    break
+        
+        if ok != 0:
+            # Next change both algorithm and tolerance to achieve convergence if this doesn't work
+            # in bocca al lupo....
+            print(" ~~~ Failed at %.2f - Relaxing the convergence criteria and increasing maximum number of iterations..." % controlTime)
+            ops.test(testType, tolInit * 0.1, iterInit * 50, 0, 2)
+            for algorithmType in algorithms:
+                print(" ~~~ Failed at %.2f - Moving to the next algorithm..." % controlTime)
+                ops.algorithm(*algorithmType)
                 ok = ops.analyze(1, Dtt)
-
-            if ok != 0:
-                print(" ~~~ Failed at %.2f - Trying Broyden......" % controlTime)
-                ops.algorithm('Broyden', 8)
-                ok = ops.analyze(1, Dt)
-
-            if ok != 0:
-                print(" ~~~ Failed at %.2f - Trying Newton with Initial Tangent......" % controlTime)
-                ops.algorithm('Newton', '-initial')
-                ok = ops.analyze(1, Dt)
-
-            if ok != 0:
-                print("Failed at %.2f - Trying NewtonWithLineSearch......" % controlTime)
-                ops.algorithm('NewtonLineSearch', 0.8)
-                ok = ops.analyze(1, Dt)
-
-            # Next change both algorithm and tolerance to achieve convergence....
-            if ok != 0:
-                print(" ~~~ Failed at %.2f - Trying Broyden & relaxed convergence......" % controlTime)
-                ops.test(testType, tolInit * 0.1, iterInit * 50)
-                ops.algorithm('Broyden', 8)
-                ok = ops.analyze(1, Dt)
-
-            if ok != 0:
-                print(
-                    " ~~~ Failed at %.2f - Trying Newton with Initial Tangent & relaxed convergence......" % controlTime)
-                ops.test(testType, tolInit * 0.1, iterInit * 50)
-                ops.algorithm('Newton', '-initial')
-                ok = ops.analyze(1, Dt)
-
-            if ok != 0:
-                print(" ~~~ Failed at %.2f - Trying NewtonWithLineSearch & relaxed convergence......" % controlTime)
-                ops.test(testType, tolInit * 0.1, iterInit * 50)
-                ops.algorithm('NewtonLineSearch', 0.8)
-                ok = ops.analyze(1, Dt)
-
-            # Next half the timestep with both algorithm and tolerance reduction, if this doesn't work - in bocca al
-            # lupo
-            if ok != 0:
-                print(
-                    " ~~~ Failed at %.2f - Trying Broyden, reduced timestep & relaxed convergence......" % controlTime)
-                ops.test(testType, tolInit * 0.1, iterInit * 50)
-                ops.algorithm('Broyden', 8)
-                Dtt = 0.5 * Dt
-                ok = ops.analyze(1, Dtt)
-
-            if ok != 0:
-                print(
-                    "~~~ Failed at %.2f - Trying Newton with Initial Tangent, reduced timestep & relaxed "
-                    "convergence......" % controlTime)
-                ops.test(testType, tolInit * 0.1, iterInit * 50)
-                ops.algorithm('Newton', '-initial')
-                Dtt = 0.5 * Dt
-                ok = ops.analyze(1, Dtt)
-
-            if ok != 0:
-                print(
-                    " ~~~ Failed at %.2f - Trying NewtonWithLineSearch, reduced time step & relaxed convergence......" % controlTime)
-                ops.test(testType, tolInit * 0.1, iterInit * 50)
-                ops.algorithm('NewtonLineSearch', 0.8)
-                Dtt = 0.5 * Dt
-                ok = ops.analyze(1, Dtt)
-            k += 1
+                if ok == 0:
+                    print(' ~~~ The relaxed convergence criteria has worked.',)
+                    break
 
         # Shit...  Failed to converge, exit the analysis.
         if ok != 0:
@@ -718,23 +720,55 @@ def nrha_multiple(obj, Dt, Tmax, Dc, log, pflag=0):
             muK1.append(0.0)
             muK2.append(0.0)
             muK.append(0.0)
-
+                
+    algorithms = [
+        ['Newton', '-initial'],
+        ['KrylovNewton'],  
+        ['ModifiedNewton', '-initial'],
+        ['NewtonLineSearch', '-InitialInterpolated', 0.8], 
+        ['Broyden', 8]
+                ]
+    
     # Define the Initial Analysis Parameters
     testType = 'NormDispIncr'  # Set the initial test type (default)
     tolInit = 1.0e-6  # Set the initial Tolerance, so it can be referred back to (default)
-    iterInit = 50  # Set the initial Max Number of Iterations (default)
-    algorithmType = 'KrylovNewton'  # Set the initial algorithm type (default)
+    iterInit = 20  # Set the initial Max Number of Iterations (default)
     
-    # Parameters required in Newmark Integrator
-    # gamma = 1/2, beta = 1/4 --> Average Acceleration Method
-    # gamma = 1/2, beta = 1/6 --> Linear Acceleration Method
-    gamma = 0.5
-    beta = 0.25  
+    # Parameters required in Newmark Integrator, no numerical dissiaption
+    # gamma = 1/2, beta = 1/4 --> Average Acceleration Method; unconditionally stable
+    # gamma = 1/2, beta = 1/6 --> Linear Acceleration Method; conditionally stable dt/T <0.551
+    # gamma = 0.5
+    # beta = 0.25
+    # ops.integrator('Newmark', gamma, beta)
 
+    # Hail Mary... Bless the analysis with thy damping!
     # Parameters required in Hilber-Hughes-Taylor (HHT) integrator
     # alpha = 1.0 = Newmark Method. smaller alpha means greater numerical damping. 
-    # 0.67<alpha<1.0 recommended. Leave beta and gamma as default for unconditional stability.
-    alpha = 0.8  
+    # 0.67<alpha<1.0 # recommended. Leave beta and gamma as default for unconditional stability.
+    # alpha = 0.67
+    # ops.integrator('HHT', alpha)
+
+    # Parameters for GeneralizedAlpha integrator.
+    # alphaF and alphaM are defined differently that in the paper, we use alpha_F = (1-alpha_f) and 
+    # alpha_M=(1-alpha_m) where alpha_f and alpha_m are those used in the paper.
+    # 1. Like Newmark and all the implicit schemes, the unconditional stability of this method 
+    # applies to linear problems. There are no results showing stability of this method over the
+    # wide range of nonlinear problems that potentially exist. Experience indicates that the time 
+    # step for implicit schemes in nonlinear situations can be much greater than those for explicit schemes.
+    # 2. alphaM = 1.0, alphaF = 1.0 produces the Newmark Method.
+    # 3. alphaM = 1.0 corresponds to the HHT method.
+    # 4. The method is second-order accurate provided gamma=0.5+alphaM-alphaF, beta=(1+alphaM-alphaF)**2/4
+    # These are optional parameters that can be used, but default values satisfy this condition
+    # 5. The method is unconditionally stable provided alphaM >= alphaF >= 0.5, beta >= 0.25+0.5*(alphaM-alphaF)
+    # The following relationships minimize low-frequency damping and maximize high-frequency damping
+    # pinf = 1 no dissipation of high frequency response 
+    # pinf = 0 annihilation of high-frequency response
+    pinf = 0.4
+    alpha_m = (2*pinf-1)/(pinf+1)
+    alpha_f = pinf/(1+pinf)
+    alphaM = 1-alpha_m
+    alphaF = 1-alpha_f
+    ops.integrator('GeneralizedAlpha', alphaM, alphaF)
 
     # Set up analysis parameters
     cIndex = 0  # Initially define the control index (-1 for non-converged, 0 for stable, 1 for global collapse)
@@ -742,102 +776,66 @@ def nrha_multiple(obj, Dt, Tmax, Dc, log, pflag=0):
     ok = 0  # Set the convergence to 0 (initially converged)
     mflr = 0  # Set the initial pier collapse location
     Mdrft = 0.0  # Set initially the maximum of all pier drifts (SRSS)
+    Dtt = Dt/1 # analysis time step
 
     # Run the actual analysis now
     while cIndex == 0 and controlTime <= Tmax and ok == 0:
-        # Set the default analysis parameters
-        # ops.integrator('HHT', alpha)  # Hail Mary... Bless the analysis with thy damping!
-        ops.integrator('Newmark', gamma, beta)
-        ops.test(testType, tolInit, iterInit)
-        ops.algorithm(algorithmType)
+        ops.test(testType, tolInit, iterInit, 0, 2)
+        ops.algorithm(*algorithms[0])
         ops.analysis('Transient')
 
+        # Gradually increase the time increment size
+        if Dtt == Dt/4:
+            Dtt = Dt/2
+        elif Dtt == Dt/2:
+            Dtt = Dt/1
+
         # Do the analysis
-        ok = ops.analyze(1, Dt)  # Run a step of the analysis
+        ok = ops.analyze(1, Dtt)  # Run a step of the analysis
         controlTime = ops.getTime()  # Update the control time
         if pflag > 1: print("Completed %.2f of %.2f seconds" % (controlTime, Tmax))
 
         # If the analysis fails, try the following changes to achieve convergence
         # Analysis will be slower in here though...
-        k = 0  # counter for the integrators
-        while k < 2 and ok != 0:
-            if k == 1:
-                # ops.integrator('Newmark', gamma, beta)
-                ops.integrator('HHT', alpha)  # Hail Mary... Bless the analysis with thy damping!
-                print(" ~~~ Changing integrator to Hilber-Hughes-Taylor (HHT) from Newmark at %.2f......" % controlTime)
-            # First changes are to change algorithm to achieve convergence...
-            if ok != 0:
-                print(" ~~~ Failed at %.2f - Reduced timestep by half......" % controlTime)
-                Dtt = 0.5 * Dt
+        
+        # Reduce analysis the time increment size
+        if ok != 0 and Dtt>Dt/2:
+            print(" ~~~ Failed at %.2f - Reduced timestep by half..." % controlTime)
+            Dtt = Dt/2
+            ok = ops.analyze(1, Dtt)
+            if ok == 0:
+                print(' ~~~ The reduced timestep has worked ', Dtt)
+
+        if ok != 0 and Dtt>Dt/4:
+            print(" ~~~ Failed at %.2f - Reduced timestep by quarter..." % controlTime)
+            Dtt = Dt/4
+            ok = ops.analyze(1, Dtt)
+            if ok == 0:
+                print(' ~~~ The reduced timestep has worked: ', Dtt)       
+
+        # Change the solution algorithm
+        if ok != 0:
+            ops.test(testType, iterInit*5, 0, 2) # lets increase the number of iterations for other algorithms than regular newton
+            for algorithmType in algorithms[1:]:
+                print(" ~~~ Failed at %.2f - Moving to the next algorithm..." % controlTime)
+                ops.algorithm(*algorithmType)
                 ok = ops.analyze(1, Dtt)
-
-            if ok != 0:
-                print(" ~~~ Failed at %.2f - Reduced timestep by quarter......" % controlTime)
-                Dtt = 0.25 * Dt
+                if ok == 0:
+                    print('The algorithm has worked: ', algorithmType)
+                    break
+        
+        if ok != 0:
+            # Next change both algorithm and tolerance to achieve convergence if this doesn't work
+            # in bocca al lupo....
+            print(" ~~~ Failed at %.2f - Relaxing the convergence criteria and increasing maximum number of iterations..." % controlTime)
+            ops.test(testType, tolInit * 0.1, iterInit * 50, 0, 2)
+            for algorithmType in algorithms:
+                print(" ~~~ Failed at %.2f - Moving to the next algorithm..." % controlTime)
+                ops.algorithm(*algorithmType)
                 ok = ops.analyze(1, Dtt)
-
-            if ok != 0:
-                print(" ~~~ Failed at %.2f - Trying Broyden......" % controlTime)
-                ops.algorithm('Broyden', 8)
-                ok = ops.analyze(1, Dt)
-
-            if ok != 0:
-                print(" ~~~ Failed at %.2f - Trying Newton with Initial Tangent......" % controlTime)
-                ops.algorithm('Newton', '-initial')
-                ok = ops.analyze(1, Dt)
-
-            if ok != 0:
-                print("Failed at %.2f - Trying NewtonWithLineSearch......" % controlTime)
-                ops.algorithm('NewtonLineSearch', 0.8)
-                ok = ops.analyze(1, Dt)
-
-            # Next change both algorithm and tolerance to achieve convergence....
-            if ok != 0:
-                print(" ~~~ Failed at %.2f - Trying Broyden & relaxed convergence......" % controlTime)
-                ops.test(testType, tolInit * 0.1, iterInit * 10)
-                # ops.test(testType, tolInit * 0.1)
-                ops.algorithm('Broyden', 8)
-                ok = ops.analyze(1, Dt)
-
-            if ok != 0:
-                print(" ~~~ Failed at %.2f - Trying Newton with Initial Tangent & relaxed convergence......" % controlTime)
-                ops.test(testType, tolInit * 0.1, iterInit * 10)
-                # ops.test(testType, tolInit * 0.1)
-                ops.algorithm('Newton', '-initial')
-                ok = ops.analyze(1, Dt)
-
-            if ok != 0:
-                print(" ~~~ Failed at %.2f - Trying NewtonWithLineSearch & relaxed convergence......" % controlTime)
-                ops.test(testType, tolInit * 0.1, iterInit * 10)
-                # ops.test(testType, tolInit * 0.1)
-                ops.algorithm('NewtonLineSearch', 0.8)
-                ok = ops.analyze(1, Dt)
-
-            # Next half the timestep with both algorithm and tolerance reduction, if this doesn't work - in bocca al lupo
-            if ok != 0:
-                print( " ~~~ Failed at %.2f - Trying Broyden, reduced timestep & relaxed convergence......" % controlTime)
-                ops.test(testType, tolInit * 0.1, iterInit * 10)
-                # ops.test(testType, tolInit * 0.1)
-                ops.algorithm('Broyden', 8)
-                Dtt = 0.5 * Dt
-                ok = ops.analyze(1, Dtt)
-
-            if ok != 0:
-                print(" ~~~ Failed at %.2f - Trying Newton with Initial Tangent, reduced timestep & relaxed convergence......" % controlTime)
-                ops.test(testType, tolInit * 0.1, iterInit * 10)
-                # ops.test(testType, tolInit * 0.1)
-                ops.algorithm('Newton', '-initial')
-                Dtt = 0.5 * Dt
-                ok = ops.analyze(1, Dtt)
-
-            if ok != 0:
-                print(" ~~~ Failed at %.2f - Trying NewtonWithLineSearch, reduced timestep & relaxed convergence......" % controlTime)
-                ops.test(testType, tolInit * 0.1, iterInit * 10)
-                # ops.test(testType, tolInit * 0.1)
-                ops.algorithm('NewtonLineSearch', 0.8)
-                Dtt = 0.5 * Dt
-                ok = ops.analyze(1, Dtt)
-            k += 1
+                if ok == 0:
+                    print(' ~~~ The relaxed convergence criteria has worked.',)
+                    break
 
         # Shit...  Failed to converge, exit the analysis.
         if ok != 0:
@@ -900,25 +898,5 @@ def nrha_multiple(obj, Dt, Tmax, Dc, log, pflag=0):
 
     if ops.getNP() == 1:
         print(Analysis)
-
-    if pflag > 0:
-        # Create some output
-        f = open(log, "w+")
-        f.write(Analysis + '\n')  # Print to the logfile the analysis state
-
-        # Print to the max interpier drifts
-        f.write("Peak Pier Drift in dir-1: ")
-        for i in range(len(mdrft1)):
-            f.write("%.2f " % mdrft1[i])
-        f.write("%\n")
-        f.write("Peak Pier Drift in dir-2: ")
-        for i in range(len(mdrft2)):
-            f.write("%.2f " % mdrft2[i])
-        f.write("%\n")
-        f.write("Peak Pier Drift: ")
-        for i in range(len(mdrft)):
-            f.write("%.2f " % mdrft[i])
-        f.write("%")
-        f.close()
 
     return Mdrft, cIndex, mflr, mdrft, mudisp, muK, Analysis, [abut1, abut2]

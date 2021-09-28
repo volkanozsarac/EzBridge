@@ -108,7 +108,7 @@ class Main(Builder, BridgeSummary, PierInfo):
         self.scale = scale
         self.fps = fps
 
-    def analysis_config(self, constraintType, numbererType, systemType, alphaS=1e16, alphaM=1e16):
+    def analysis_config(self, constraintType, numbererType, systemType, alphaS=1e15, alphaM=1e15):
         """
         -----------------------------------
         SET SOME ANALYSIS PARAMETERS
@@ -117,8 +117,8 @@ class Main(Builder, BridgeSummary, PierInfo):
             constraintType: Set the constraint type for analysis ('Transformation' or 'Penalty')
             numbererType: 'RCM' Set the the numberer type for analysis (mapping between equation numbers and DOFs)
             systemType: 'UmfPack'  Set the system type for analysis (Linear Equation Solvers)
-            alphaS: penalty factor on single point constraints
-            alphaM	penalty factor on multi-point constraints
+            alphaS: penalty factor on single point constraints, default is 1e15
+            alphaM:	penalty factor on multi-point constraints, default is 1e15
         Returns:
 
         """
@@ -129,7 +129,7 @@ class Main(Builder, BridgeSummary, PierInfo):
         self.alphaS = alphaS
         self.alphaM = alphaM
 
-    def set_recorders(self):
+    def set_recorders(self, out_dir = ''):
         """
         -------------------------------
         ADD THE RECORDERS
@@ -140,7 +140,7 @@ class Main(Builder, BridgeSummary, PierInfo):
             inside EzGM/Recorders.py
             
         """
-        Recorders.user(self)
+        Recorders.user(self, out_dir)
 
     def plot_model(self, show_node_tags='no',
                    show_element_tags='no',
@@ -1096,12 +1096,21 @@ class Main(Builder, BridgeSummary, PierInfo):
 
             return gm_mat, GM_dur, GMdt
 
+
         def Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag, SupportNode=None):
             # Define the Time Series and and the Load Pattern
             for i in range(1, 4):
                 # Setting time series
                 gm_i = gm_mat[i - 1, :]
-                ops.timeSeries('Path', tsTag, '-dt', GMdt, '-values', *list(gm_i), '-factor', 1.0)
+
+                # if we apply displacement time-history keep it constant during free vibration
+                # Otherwise, OpenSees will use 0
+                if excitation == 'Multi-Support' and signal == '-disp' and tFree != 0:
+                    # lets add 5 more steps to make sure of no zeros at the end
+                    npts_add = int(np.floor(len(gm_i)+tFree/GMdt))-len(gm_i)+5
+                    gm_i = np.append(gm_i,np.full((1, npts_add), gm_i[-1]))
+
+                ops.timeSeries('Path', tsTag, '-dt', GMdt, '-values', *gm_i.tolist(), '-factor', ScaleFactor)
 
                 # Creating UniformExcitation load pattern
                 if excitation == 'Uniform':
@@ -1285,6 +1294,10 @@ class Main(Builder, BridgeSummary, PierInfo):
             create_outdir(self.animation_dir)
             Recorders.animation(self.animation_dir)
 
+        # # Lets save recorder outputs here
+        # out_dir2 = os.path.join(self.out_dir, 'PyResults')
+        # create_outdir(out_dir2)
+        # self.set_recorders(out_dir2)
         Analysis.nrha_single(self, DtAnalysis, tFinal, Dc,
                              os.path.join(self.out_dir, 'NRHA_Summary.txt'), pFlag)
 
@@ -1294,7 +1307,8 @@ class Main(Builder, BridgeSummary, PierInfo):
 
     def msa(self, gm_msa, damping='Stiffness', GMangle=0,
             Modes=1, xi=0.02, xi_modal=None, Dc=10, tFree=0,
-            excitation='Uniform', signal='-accel', ScaleFactor=1.0):
+            excitation='Uniform', signal='-accel', ScaleFactor=1.0,
+            DtFactors = [0.5, 0.1, 0.05]):
         """
         -----------------------------------------------
         -- Script to Conduct Multple-Stripe Analysis --
@@ -1405,6 +1419,14 @@ class Main(Builder, BridgeSummary, PierInfo):
             for i in range(1, 4):
                 # Setting time series
                 gm_i = gm_mat[i - 1, :]
+
+                # if we apply displacement time-history keep it constant during free vibration
+                # Otherwise, OpenSees will use 0
+                if excitation == 'Multi-Support' and signal == '-disp' and tFree != 0:
+                    # lets add 5 more steps to make sure of no zeros at the end
+                    npts_add = int(np.floor(len(gm_i)+tFree/GMdt))-len(gm_i)+5
+                    gm_i = np.append(gm_i,np.full((1, npts_add), gm_i[-1]))
+
                 ops.timeSeries('Path', tsTag, '-dt', GMdt, '-values', *gm_i.tolist(), '-factor', ScaleFactor)
 
                 # Creating UniformExcitation load pattern
@@ -1463,11 +1485,6 @@ class Main(Builder, BridgeSummary, PierInfo):
             log = open(logfile_path, 'w')  # create a log file for each set
             log.write(program_info())
 
-            # Try changing DtFactors if the analysis does not converge
-            DtFactors = [1.0]
-            for i in range(3):
-                DtFactors.append(DtFactors[-1] * 0.5)
-
             dt_path = os.path.join(gm_dir, gm_msa['dts_file'])
             dts = np.loadtxt(dt_path)
             try:
@@ -1523,6 +1540,9 @@ class Main(Builder, BridgeSummary, PierInfo):
                 # Get the ground motion
                 GMdt = dts[iii]
 
+                # Try changing time step of analysis if the analysis does not converge
+                Dts_NRHA = [GMdt*DtFactor for DtFactor in DtFactors]
+
                 if excitation == 'Uniform':
                     GMs = [gm_names[iii] for gm_names in GM_uniform]
                     gm_mat, GM_dur, GMdt = get_time_series(gm_msa['MSAcomponents'], GMs, gm_dir, GMdt)
@@ -1540,10 +1560,10 @@ class Main(Builder, BridgeSummary, PierInfo):
                 cIndex = -1
                 cLoop = 0
                 # Lets try to reduce the time step if convergence is not satisfied, and re-run the analysis
-                while cIndex == -1 and cLoop < len(DtFactors):
+                while cIndex == -1 and cLoop < len(Dts_NRHA):
                     if cLoop != 0: error_log.append(
                         'While running ' + gm_text + ' analysis failed to converge, reducing the analysis time step...')
-                    DtAnalysis = GMdt * DtFactors[cLoop]
+                    DtAnalysis = Dts_NRHA[cLoop]
                     cLoop += 1
                     #  ----------------------------------------------------------------------------
                     #  Gravity Analysis
@@ -1695,9 +1715,14 @@ class Main(Builder, BridgeSummary, PierInfo):
                                     tsTag, pTag, gmTag = Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag,
                                                                              gmTag, SupportNode)
                                 count += 1
-
+                    
+                    # # Lets save recorder outputs here
+                    # out_dir2 = os.path.join(out_dir, 'GMR_'+str(iii+1))
+                    # create_outdir(out_dir2)
+                    # self.set_recorders(out_dir2)
+                        
                     Mdrft, cIndex, mpier, mdrft, mudisp, muK, anlys, abutdisps = \
-                        Analysis.nrha_multiple(self, DtAnalysis, tFinal, Dc, '',  0)
+                        Analysis.nrha_multiple(self, DtAnalysis, tFinal, Dc, '',  2)
                 time_text = RunTime(startT)
                 log.write(gm_text + '\n')
                 log.write(anlys + '\n')

@@ -10,24 +10,30 @@ m, kN, sec, mm, cm, inch, ft, N, kip, tonne, kg, Pa, kPa, MPa, GPa, ksi, psi = E
 ############## INPUT STARTS HERE ###############
 ################################################
 
+w1 = 2*(0.25*m**2)*(25*kN/m**3) # bordure weight 
+w2 = 2*(2*kN/m) # Railing weight 
+w3 = (10*m)*(0.06*m)*(23*kN/m**3) # asphalt weight
+
+#  ----------------------------------------------------------------------------
+#  INPUT for model generation 
+#  ----------------------------------------------------------------------------
 inputs = {
     'Mass': 'Lumped',
 
     'Deck': {
         'Type': 'Continuous',  # ('Continuous', 'Discontinuous')
-        'Xs': [0, 40, 90, 140, 180],
-        'Ys': [0, 0, 0, 0, 0],
-        'Zs': [18, 18, 18, 18, 18],
-        'A': 7.85* m ** 2,
-        'Iy': 6.76 * m ** 4,
-        'Iz': 33.6 * m ** 4,
-        'J': 16.58* m ** 4,
-        'E': 31225 * MPa,
-        'G': 31225 * MPa / (2 * (1 + 0.2)),
-        'wSDL': 0,
+        'Xs': [0, 34, 68],
+        'Ys': [0, 0, 0],
+        'Zs': [7.415, 7.415, 7.415],
+        'A': 9.067 * m ** 2,
+        'Iy': 1.558 * m ** 4,
+        'Iz': 32.81 * m ** 4,
+        'J': 2.954 * m ** 4,
+        'E': 31224 * MPa,
+        'G': 31224 * MPa / (2 * (1 + 0.2)),
+        'wSDL': w1+w2+w3,
         'numEle': 7,
     },
-
 
     'LinkSlab': {  # note: Iy is reduced to 20%, Iz, J are reduced to 50%
         'cond': [1],  # if 1 link slab exist on joint, if 0 not
@@ -40,70 +46,70 @@ inputs = {
     },
 
     'Bearing': {
-        'dv': [2 * m, 2 * m, 2 * m, 2 * m, 2 * m],  # vertical distance from deck centroid to bearing top
-        'dh': [0 * m, 0 * m, 0 * m, 0 * m, 0 * m],  # vertical distance from cap centroid to bearing
-        'h': [0 * cm, 0 *cm, 0 *cm, 0 *cm, 0 *cm],  # height of bearings
-        's': [1310 * mm, 1310 * mm, 1310 * mm, 1310 * mm, 1310 * mm],  # spacing of bearings (if more than 1)
+        'dv': [0.756 * m, 0.756 * m, 0.756 * m],  # vertical distance from deck centroid to bearing top
+        'dh': [0.93 * m, 0.93 * m, 0.93 * m],  # vertical distance from cap centroid to bearing
+        'h': [0 * cm, 0 * cm, 0 * cm],  # height of bearings
+        's': [1310 * mm, 1310 * mm, 1310 * mm],  # spacing of bearings (if more than 1)
 
         # Distributed bearing approach
-        'N': [10, 10, 10, 10, 10],  # underneath each span end
-        'Type': ['Elastic', 'Elastic', 'Elastic', 'Elastic', 'Elastic'],  # Type of bearing
-        'kx': [1755 * kN / m, 1755 * kN / m, 1755 * kN / m, 1755 * kN / m, 1755 * kN / m],
-        'ky': [1e8 * kN / m, 1e8 * kN / m, 1e8 * kN / m, 1e8 * kN / m, 1e8 * kN / m],
-        'kz': [1143752 * kN / m, 1143752 * kN / m, 1143752 * kN / m, 1143752 * kN / m, 1143752 * kN / m],
-        'krx': [10 * kN / m, 10 * kN / m, 10 * kN / m, 10 * kN / m, 10 * kN / m],
-        'kry': [10 * kN / m, 10 * kN / m, 10 * kN / m, 10 * kN / m, 10 * kN / m],
-        'krz': [10 * kN / m, 10 * kN / m, 10 * kN / m, 10 * kN / m, 10 * kN / m]
+        'N': [10, 10, 10],  # underneath each span end
+        'Type': ['Elastic', 'Elastic', 'Elastic'],  # Type of bearing
+        'kx': [1755 * kN / m, 1755 * kN / m, 1755 * kN / m],
+        'ky': [1e8 * kN / m, 1e8 * kN / m, 1e8 * kN / m],
+        'kz': [1143752 * kN / m, 1143752 * kN / m, 1143752 * kN / m],
+        'krx': [10 * kN / m, 10 * kN / m, 10 * kN / m],
+        'kry': [10 * kN / m, 10 * kN / m, 10 * kN / m],
+        'krz': [10 * kN / m, 10 * kN / m, 10 * kN / m]
 
         # Lumped bearing approach
-        # 'N': [1, 1, 1, 1, 1],
-        # 'Type': ['Elastic', 'Elastic', 'Elastic', 'Elastic', 'Elastic'],
-        # 'kx': [10 * 1755 * kN / m, 10 * 1755 * kN / m, 10 * 1755 * kN / m, 10 * 1755 * kN / m, 10 * 1755 * kN / m],
-        # 'ky': [1e8 * kN / m, 1e8 * kN / m, 1e8 * kN / m, 1e8 * kN / m, 1e8 * kN / m],
-        # 'kz': [10 * 51200 * kN / m, 10 * 51200 * kN / m, 10 * 51200 * kN / m, 10 * 51200 * kN / m, 10 * 51200 * kN / m],
-        # 'krx': [1e10 * kN / m, 1e10 * kN / m, 1e10 * kN / m, 1e10 * kN / m, 1e10 * kN / m],
-        # 'kry': [10 * kN / m, 10 * kN / m, 10 * kN / m, 10 * kN / m, 10 * kN / m],
-        # 'krz': [1e10 * kN / m, 1e10 * kN / m, 1e10 * kN / m, 1e10 * kN / m, 1e10 * kN / m]
+        # 'N': [1, 1, 1],
+        # 'Type': ['Elastic', 'Elastic', 'Elastic'],
+        # 'kx': [10 * 1755 * kN / m, 10 * 1755 * kN / m, 10 * 1755 * kN / m],
+        # 'ky': [1e8 * kN / m, 1e8 * kN / m, 1e8 * kN / m],
+        # 'kz': [7 * 51200 * kN / m, 7 * 51200 * kN / m, 7 * 51200 * kN / m],
+        # 'krx': [1e10 * kN / m, 1e10 * kN / m, 1e10 * kN / m],
+        # 'kry': [10 * kN / m, 10 * kN / m, 10 * kN / m],
+        # 'krz': [1e10 * kN / m, 1e10 * kN / m, 1e10 * kN / m]
 
         # This is like assigning a release
-        # 'N': [1, 1, 1, 1, 1],
-        # 'Type': ['Elastic', 'Elastic', 'Elastic', 'Elastic', 'Elastic'],
-        # 'kx': [1e14 * kN / m, 1e14 * kN / m, 1e14 * kN / m, 1e14 * kN / m, 1e14 * kN / m],
-        # 'ky': [1e14 * kN / m, 1e14 * kN / m, 1e14 * kN / m, 1e14 * kN / m, 1e14 * kN / m],
-        # 'kz': [1e14 * kN / m, 1e14 * kN / m, 1e14 * kN / m, 1e14 * kN / m, 1e14 * kN / m],
-        # 'krx': [1e14 * kN / m, 1e14 * kN / m, 1e14 * kN / m, 1e14 * kN / m, 1e14 * kN / m],
-        # 'kry': [0 * kN / m, 0 * kN / m, 0 * kN / m, 0 * kN / m, 0 * kN / m],
-        # 'krz': [1e14 * kN / m, 1e14 * kN / m, 1e14* kN / m, 1e14 * kN / m, 1e14 * kN / m]
+        # 'N': [1, 1, 1],
+        # 'Type': ['Elastic', 'Elastic', 'Elastic'],
+        # 'kx': [0, 1e14 * kN / m, 0],
+        # 'ky': [1e14 * kN / m, 1e14 * kN / m, 1e14 * kN / m],
+        # 'kz': [1e14 * kN / m, 1e14 * kN / m, 1e14 * kN / m],
+        # 'krx': [1e14 * kN / m, 1e14 * kN / m, 1e14 * kN / m],
+        # 'kry': [0, 0, 0],
+        # 'krz': [1e14 * kN / m, 1e14 * kN / m, 1e14 * kN / m]
 
         # Elastomeric bearings
-        # 'N': [10, 10, 10, 10, 10], 
-        # 'Type': ['ElastomericX', 'ElastomericX', 'ElastomericX', 'ElastomericX', 'ElastomericX'],
-        # 'Fy': [150*kN, 150*kN, 150*kN, 150*kN, 150*kN],
-        # 'alpha': [0.15, 0.15, 0.15, 0.15, 0.15],
-        # 'G': [0.8*MPa, 0.8*MPa, 0.8*MPa, 0.8*MPa, 0.8*MPa],
-        # 'K': [2*GPa, 2*GPa, 2*GPa, 2*GPa, 2*GPa],
-        # 'D1': [0*cm, 0*cm, 0*cm, 0*cm, 0*cm],
-        # 'D2': [50*cm, 50*cm, 50*cm, 50*cm, 50*cm],
-        # 'ts': [1*mm, 1*mm, 1*mm, 1*mm, 1*mm],
-        # 'tr': [4*mm, 4*mm, 4*mm, 4*mm, 4*mm],
-        # 'nr': [40, 40, 40, 40, 40]
+        # 'N': [10, 10, 10],
+        # 'Type': ['ElastomericX', 'ElastomericX', 'ElastomericX'],
+        # 'Fy': [150*kN, 150*kN, 150*kN],
+        # 'alpha': [0.15, 0.15, 0.15],
+        # 'G': [0.8*MPa, 0.8*MPa, 0.8*MPa],
+        # 'K': [2*GPa, 2*GPa, 2*GPa],
+        # 'D1': [0*cm, 0*cm, 0*cm],
+        # 'D2': [50*cm, 50*cm, 50*cm],
+        # 'ts': [1*mm, 1*mm, 1*mm],
+        # 'tr': [4*mm, 4*mm, 4*mm],
+        # 'nr': [40, 40, 40]
 
         # Elastomeric bearings
-        # 'N': [10, 10, 10, 10, 10], 
-        # 'Type': ['elastomericBearingBoucWen', 'elastomericBearingBoucWen', 'elastomericBearingBoucWen', 'elastomericBearingBoucWen', 'elastomericBearingBoucWen'],
-        # 'Kvert': [1e7*kN/m, 1e7*kN/m, 1e7*kN/m, 1e7*kN/m, 1e7*kN/m],
-        # 'Kinit': [1000*kN/m, 1000*kN/m, 1000*kN/m, 1000*kN/m, 1000*kN/m],
-        # 'Fb': [150*kN, 150*kN, 150*kN, 150*kN, 150*kN],
-        # 'alpha1': [0.4, 0.4, 0.4, 0.4, 0.4],
-        # 'alpha2': [0, 0, 0, 0, 0],
-        # 'mu': [1, 1, 1, 1, 1]
+        # 'N': [10, 10, 10],
+        # 'Type': ['elastomericBearingBoucWen', 'elastomericBearingBoucWen', 'elastomericBearingBoucWen'],
+        # 'Kvert': [1e7*kN/m, 1e7*kN/m, 1e7*kN/m],
+        # 'Kinit': [1000*kN/m, 1000*kN/m, 1000*kN/m],
+        # 'Fb': [150*kN, 150*kN, 150*kN],
+        # 'alpha1': [0.4, 0.4, 0.4,
+        # 'alpha2': [0, 0, 0],
+        # 'mu': [1, 1, 1]
 
         # Friction Type Isolators
-        # 'N': [3, 3, 3, 3, 3],
-        # 'Type': ['singleFPBearing_coulomb', 'singleFPBearing_coulomb', 'singleFPBearing_coulomb', 'singleFPBearing_coulomb', 'singleFPBearing_coulomb']
-        # 'R': [3.4*m, 3.4*m, 3.4*m, 3.4*m, 3.4*m],
-        # 'mu': [0.03, 0.03, 0.03, 0.03, 0.03],
-        # 'K': [1e7*kN/m, 1e7*kN/m, 1e7*kN/m, 1e7*kN/m, 1e7*kN/m]
+        # 'N': [3, 3, 3],
+        # 'Type': ['singleFPBearing_coulomb', 'singleFPBearing_coulomb', 'singleFPBearing_coulomb']
+        # 'R': [3.4*m, 3.4*m, 3.4*m],
+        # 'mu': [0.03, 0.03, 0.03],
+        # 'K': [1e7*kN/m, 1e7*kN/m, 1e7*kN/m]
     },
 
     'BentCap': {
@@ -117,9 +123,9 @@ inputs = {
     'Bent': {
         'N': 1,  # Number of Piers per Bent
         'Dist': 8 * m,  # Spacing between the Piers
-        'H': [16*m, 12*m, 16*m],  # Pier Heights
-        'Sections': [1, 1, 1],  # Define section id used for each bent (start from 1)
-        'EleType': 4,
+        'H': [6 * m],  # Pier Heights
+        'Sections': [1],  # Define section id used for each bent (start from 1)
+        'EleType': 0,
         # Fully Elastic element:
         # 0: Legendre - section
         # Lumped Plasticity (elastic interior):
@@ -129,16 +135,16 @@ inputs = {
         # 3: HingeRadau (fiber sections)
         # 4: Lobatto with 5 gauss points (fiber sections)
         # Sections
-        'RF': 1,  # Modulus reduction factor for EleType 0 case
+        'RF': 0.5,  # Modulus reduction factor for EleType 0 case
         'SectionTypes': 'Circ',  # Define section tags used for each bent
-        'D': [2 * m],  # Diameter of the circular column section
+        'D': [1.68 * m],  # Diameter of the circular column section
         'Fce': [39 * MPa],  # Expected nominal compressive strength of the concrete material
         'Fyle': [462 * MPa],  # Expected yield strength of longitudinal rebars
         'Fyhe': [462 * MPa],  # Expected yield strength of transverse rebars
         'cover': [50 * mm],  # Clear cover to centroid of stirrups
-        'numBars': [92],  # Number of longitudinal bars
-        'dl': [40 * mm],  # Nominal diameter of longitudinal bars
-        'dh': [20 * mm],  # Nominal diameter of transversal bars
+        'numBars': [44],  # Number of longitudinal bars
+        'dl': [36 * mm],  # Nominal diameter of longitudinal bars
+        'dh': [18 * mm],  # Nominal diameter of transversal bars
         's': [100 * mm],  # Vertical spacing between the centroid of spirals or hoops
         'TransReinfType': ['Hoops']  # Type of transversal steel, 'Hoops' or 'Spirals'
     },
@@ -155,9 +161,9 @@ inputs = {
         # 'Ky': [1400 * kN / mm, 1400 * kN / mm],
 
         'Type': 'SDC 2019',
-        'spring': 2,  # 2 or 1
+        'spring': 1,  # 2 or 1
         'gap': 100 * mm,  # in longitudinal direction
-        'gapFlag': 1,  # in longitudinal direction
+        'gapFlag': 0,  # in longitudinal direction
         'height': 3.5 * m,
         'width': 12 * m,
         'breadth': 1 * m,
@@ -176,7 +182,7 @@ inputs = {
         # 'Krz': [50000.00e3*kN/m, 50000.00e3*kN/m]   #  Elastic Spring Property, -dof rZ
 
         'Type': 'Group Pile',  # Foundation Type (Fixed, Macro elements, Pile-Shaft, Group Pile)
-        'file': 'SoilProfiles.xlsx', # Name of the excel file where soil info is saved
+        'file': 'SoilProfiles.xlsx', # File where the soil profiles is saved
         'py_Mat': 'PySimple1', # material for p-y springs ('PySimple1', 'NonGapping_MultiLinear')
         'tz_qz': 1,  # Use tz_qz springs if 1, use pinned base if 0
         'EleType': 0,
@@ -185,8 +191,8 @@ inputs = {
         # - Gauss Legendre with 2 gauss points
         # 2: Force-Based Beam column element with inelastic fiber section
         # - Gauss Lobatto with 3 gauss points
-        'Height': [3.5, 3.5],
-        'RF': 0.7,  # Modulus reduction factor for EleType 0 case
+        'Height': [3, 3],
+        'RF': 0.75,  # Modulus reduction factor for EleType 0 case
         'Sections': [1, 1],  # Define section id used for piles underneath each bent (start from 1)
         'D': [1 * m],  # Pile diameter
         'Fce': [39 * MPa],  # Expected nominal compressive strength of the concrete material
@@ -210,15 +216,15 @@ inputs = {
 
         # 'Type': 'Springs',  # Foundation Type (Fixed, Macro elements, Pile-Shaft, Group Pile)
         # 'Thickness': 1*m,  # Foundation Type (Fixed, Macro elements, Pile-Shaft, Group Pile)
-        # 'Kx': [147.06e3*kN/m, 147.06e3*kN/m, 147.06e3*kN/m],  #  Elastic Spring Property, -dof X
-        # 'Ky': [150.83e3*kN/m, 150.83e3*kN/m, 150.83e3*kN/m],  #  Elastic Spring Property, -dof Y
-        # 'Kz': [2439.02e3*kN/m, 2439.02e3*kN/m, 2439.02e3*kN/m],  #  Elastic Spring Property, -dof Z
-        # 'Krx': [50000.00e3*kN/m, 50000.00e3*kN/m, 50000.00e3*kN/m],  #  Elastic Spring Property, -dof rX
-        # 'Kry': [12500.00e3*kN/m, 12500.00e3*kN/m, 12500.00e3*kN/m],  #  Elastic Spring Property, -dof rY
-        # 'Krz': [50000.00e3*kN/m, 50000.00e3*kN/m, 50000.00e3*kN/m]   #  Elastic Spring Property, -dof rZ
+        # 'Kx': [147.06e3*kN/m],  #  Elastic Spring Property, -dof X
+        # 'Ky': [150.83e3*kN/m],  #  Elastic Spring Property, -dof Y
+        # 'Kz': [2439.02e3*kN/m],  #  Elastic Spring Property, -dof Z
+        # 'Krx': [50000.00e3*kN/m],  #  Elastic Spring Property, -dof rX
+        # 'Kry': [12500.00e3*kN/m],  #  Elastic Spring Property, -dof rY
+        # 'Krz': [50000.00e3*kN/m]   #  Elastic Spring Property, -dof rZ
 
         # 'Type': 'Pile-Shaft',  # Foundation Type (Fixed, Macro elements, Pile-Shaft, Group Pile)
-        # 'file': 'SoilProfiles.xlsx', # Name of the excel file where soil info is saved
+        # 'file': 'SoilProfiles.xlsx, # File where the soil profiles is saved
         # 'py_Mat': 'PySimple1', # material for p-y springs ('PySimple1', 'NonGapping_MultiLinear')
         # 'tz_qz': 1,  # Use tz_qz springs if 1, use pinned base if 0
         # 'EleType': 0,  # 0: Displacement-Based Beam column element with elastic section
@@ -227,7 +233,7 @@ inputs = {
         # # 2: Force-Based Beam column element with inelastic fiber section
         # # - Gauss Lobatto with 3 gauss points
         # 'RF': 0.75,  # Modulus reduction factor for EleType 0 case
-        # 'Sections': [1, 1, 1],  # Define section id used for piles underneath each bent (start from 1)
+        # 'Sections': [1],  # Define section id used for piles underneath each bent (start from 1)
         # 'D': [3.2 * m],  # Pile diameter
         # 'Fce': [39 * MPa],  # Expected nominal compressive strength of the concrete material
         # 'Fyle': [462 * MPa],  # Expected yield strength of longitudinal rebars
@@ -240,7 +246,7 @@ inputs = {
         # 'TransReinfType': ['Hoops'],  # Type of transversal steel, 'Hoops' or 'Spirals'
 
         'Type': 'Group Pile',  # Foundation Type (Fixed, Macro elements, Pile-Shaft, Group Pile)
-        'file': 'SoilProfiles.xlsx', # Name of the excel file where soil info is saved
+        'file': 'SoilProfiles.xlsx', # File where the soil profiles is saved
         'py_Mat': 'PySimple1', # material for p-y springs ('PySimple1', 'NonGapping_MultiLinear')
         'tz_qz': 1,  # Use tz_qz springs if 1, use pinned base if 0
         'EleType': 0,
@@ -249,8 +255,8 @@ inputs = {
         # - Gauss Legendre with 2 gauss points
         # 2: Force-Based Beam column element with inelastic fiber section
         # - Gauss Lobatto with 3 gauss points
-        'RF': 0.7,  # Modulus reduction factor for EleType 0 case
-        'Sections': [1, 1, 1],  # Define section id used for piles underneath each bent (start from 1)
+        'RF': 0.75,  # Modulus reduction factor for EleType 0 case
+        'Sections': [1],  # Define section id used for piles underneath each bent (start from 1)
         'D': [1 * m],  # Pile diameter
         'Fce': [39 * MPa],  # Expected nominal compressive strength of the concrete material
         'Fyle': [462 * MPa],  # Expected yield strength of longitudinal rebars
@@ -263,14 +269,14 @@ inputs = {
         'TransReinfType': ['Hoops'],  # Type of transversal steel, 'Hoops' or 'Spirals'
         'cap_t': 2 * m,  # pile cap thickness
         'cap_A': 50 * m ** 2,  # pile cap area
-        'nx': [2, 2, 2],  # number of rows in x dir
-        'ny': [2, 2, 2],  # number of rows in y dir
-        'sx': [3 * m, 3 * m, 3 * m],  # spacing in x dir
-        'sy': [3 * m, 3 * m, 3 * m],  # spacing in y dir
-        'Group Effect': 1 # lower pult to include group effect for piles
+        'nx': [3],  # number of rows in x dir
+        'ny': [3],  # number of rows in y dir
+        'sx': [3 * m],  # spacing in x dir
+        'sy': [3 * m],  # spacing in y dir
+        'Group Effect': 1
     }
 }
-    
+
 #  ----------------------------------------------------------------------------
 #  INPUT for single NRHA: 
 #  ----------------------------------------------------------------------------
@@ -286,7 +292,7 @@ gm_msa = {
     'Folder': 'P0',
     # GMFiles/MSA/Folder --> this is the folder containing input records for MSA, P0 accounts for processor name that is being used
     'MSAcomponents': [1, 2, 3],  # Ground motion components to use in the analysis
-    'dts_file': "GMR_dts.txt",  # Time steps of ground motions to run for uniform excitation case
+    'dts_file': "GMR_dts.txt",   # Time steps of ground motions to run for any case case
     'gm_H1_names_file': "GMR_H1_names.txt",  # Names of ground motions to run (dir 1) for uniform excitation case
     'gm_H2_names_file': "GMR_H2_names.txt",  # Names of ground motions to run (dir 2) for uniform excitation case
     'gm_V_names_file': "GMR_V_names.txt",  # Names of ground motions to run (dir 3) for uniform excitation case
@@ -326,8 +332,7 @@ Bridge.generate_model()
 Bridge.get_summary()
 
 # Plot the model
-# Bridge.plot_model(show_node='yes', show_node_tags= 'yes', show_element_tags= 'yes')
-Bridge.plot_model()
+Bridge.plot_model(show_node='yes')
 Bridge.plot_sections()
 
 # Set some analysis configurations
@@ -339,7 +344,7 @@ Bridge.gravity(pflag=1, load_type=1)
 # Modal analysis
 Bridge.modal(numEigen=10)
 
-# # Plot mode shapes
+# Plot mode shapes
 Bridge.plot_modeshape(1,200)
 Bridge.plot_modeshape(2,200)
 Bridge.plot_modeshape(3,200)
@@ -354,28 +359,24 @@ Bridge.plot_modeshape(3,200)
 # Bridge.set_recorders()
 
 # Animation option for nspa and nrha
-Bridge.animation_config(animate=1, Movie=0, FrameStep=5, scale=10, fps=50)
+# Bridge.animation_config(animate=1, Movie=0, FrameStep=5, scale=10, fps=50)
 
-# Pushover analysis with Uniform loading scheme
+# Pushover analysis
 # Bridge.nspa(scheme = 'Uniform', PushOption = 1, 
-# ctrlNode = 3001, IOflag = 0, ctrlDOF = 1)
-
-# Pushover analysis with 1st mode proportional loading scheme
-# Bridge.nspa(scheme = 'Modal', PushOption = 1, 
-# ctrlNode = 3001, IOflag = 0, ctrlDOF = 1, mode_nspa=1)
+# ctrlNode = 2001, IOflag = 0, ctrlDOF = 1)
 
 # Nonlinear response history analysis
 Bridge.nrha(excitation = 'Uniform', GMs = GMs, GM_components=GMcomponents, GM_factors=GMfactors, DtFactor = 1.0, pFlag=1, GMdt = 0.005)
 # Bridge.nrha(excitation = 'Multi-Support', signal = '-accel', GMs = GMs, GM_components=GMcomponents, GM_factors=GMfactors, DtFactor = 1.0, pFlag=1, GMdt = 0.005)
 
 # Multiple-stripe analysis
-# Bridge.msa(gm_msa, excitation='Multi-Support', signal='-accel', ScaleFactor=9.81)
-# Bridge.msa(gm_msa, excitation='Uniform', ScaleFactor=9.81)
+# Bridge.msa(gm_msa, excitation='Multi-Support', signal='-disp', tFree = 5)
+# Bridge.msa(gm_msa, excitation='Uniform', ScaleFactor=9.81, tFree = 5)
 
 # Incremental dynamic analysis
 # Bridge.ida_htf(htf, gm_ida, im, gmFol, IDAdir)
 
 # Wipe the model
-# Bridge.wipe_model()
+Bridge.wipe_model()
 
 print(RunTime(T0))
