@@ -462,12 +462,17 @@ def nrha_single(obj, Dt, Tmax, Dc, log, pflag=0):
     # The following relationships minimize low-frequency damping and maximize high-frequency damping
     # pinf = 1 no dissipation of high frequency response 
     # pinf = 0 annihilation of high-frequency response
-    pinf = 0.4
-    alpha_m = (2*pinf-1)/(pinf+1)
-    alpha_f = pinf/(1+pinf)
-    alphaM = 1-alpha_m
-    alphaF = 1-alpha_f
-    ops.integrator('GeneralizedAlpha', alphaM, alphaF)
+    # pinf = 0.4
+    # alpha_m = (2*pinf-1)/(pinf+1)
+    # alpha_f = pinf/(1+pinf)
+    # alphaM = 1-alpha_m
+    # alphaF = 1-alpha_f
+    # ops.integrator('GeneralizedAlpha', alphaM, alphaF)
+
+    # Create a TRBDF2 integrator. The TRBDF2 integrator is a composite scheme that alternates between the 
+    # Trapezoidal scheme and a 3 point backward Euler scheme. It does this in an attempt to conserve energy and momentum, 
+    # something Newmark does not always do.
+    ops.integrator('TRBDF2')
 
     # Set up analysis parameters
     cIndex = 0  # Initially define the control index (-1 for non-converged, 0 for stable, 1 for global collapse)
@@ -763,12 +768,17 @@ def nrha_multiple(obj, Dt, Tmax, Dc, log, pflag=0):
     # The following relationships minimize low-frequency damping and maximize high-frequency damping
     # pinf = 1 no dissipation of high frequency response 
     # pinf = 0 annihilation of high-frequency response
-    pinf = 0.4
-    alpha_m = (2*pinf-1)/(pinf+1)
-    alpha_f = pinf/(1+pinf)
-    alphaM = 1-alpha_m
-    alphaF = 1-alpha_f
-    ops.integrator('GeneralizedAlpha', alphaM, alphaF)
+    # pinf = 0.4
+    # alpha_m = (2*pinf-1)/(pinf+1)
+    # alpha_f = pinf/(1+pinf)
+    # alphaM = 1-alpha_m
+    # alphaF = 1-alpha_f
+    # ops.integrator('GeneralizedAlpha', alphaM, alphaF)
+
+    # Create a TRBDF2 integrator. The TRBDF2 integrator is a composite scheme that alternates between the 
+    # Trapezoidal scheme and a 3 point backward Euler scheme. It does this in an attempt to conserve energy and momentum, 
+    # something Newmark does not always do.
+    ops.integrator('TRBDF2')
 
     # Set up analysis parameters
     cIndex = 0  # Initially define the control index (-1 for non-converged, 0 for stable, 1 for global collapse)
