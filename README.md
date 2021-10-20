@@ -1,5 +1,5 @@
 # EzBridge
-Toolbox for creating and analyzing RC bridge structures via OpenSeespy
+Toolbox for creating and analyzing RC bridge structures via OpenSeesPy
 
 [![DOI](https://zenodo.org/badge/355892998.svg)](https://zenodo.org/badge/latestdoi/355892998)
 ***
