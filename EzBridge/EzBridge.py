@@ -1096,21 +1096,12 @@ class Main(Builder, BridgeSummary, PierInfo):
 
             return gm_mat, GM_dur, GMdt
 
-
         def Create_Load_Pattern(gm_mat, GMdt, tsTag, pTag, gmTag, SupportNode=None):
             # Define the Time Series and and the Load Pattern
             for i in range(1, 4):
                 # Setting time series
                 gm_i = gm_mat[i - 1, :]
-
-                # if we apply displacement time-history keep it constant during free vibration
-                # Otherwise, OpenSees will use 0
-                if excitation == 'Multi-Support' and signal == '-disp' and tFree != 0:
-                    # lets add 5 more steps to make sure of no zeros at the end
-                    npts_add = int(np.floor(len(gm_i)+tFree/GMdt))-len(gm_i)+5
-                    gm_i = np.append(gm_i,np.full((1, npts_add), gm_i[-1]))
-
-                ops.timeSeries('Path', tsTag, '-dt', GMdt, '-values', *gm_i.tolist(), '-factor', ScaleFactor)
+                ops.timeSeries('Path', tsTag, '-dt', GMdt, '-values', *list(gm_i), '-factor', 1.0)
 
                 # Creating UniformExcitation load pattern
                 if excitation == 'Uniform':
@@ -1307,8 +1298,7 @@ class Main(Builder, BridgeSummary, PierInfo):
 
     def msa(self, gm_msa, damping='Stiffness', GMangle=0,
             Modes=1, xi=0.02, xi_modal=None, Dc=10, tFree=0,
-            excitation='Uniform', signal='-accel', ScaleFactor=1.0,
-            DtFactors = [0.5, 0.1, 0.05]):
+            excitation='Uniform', signal='-accel', ScaleFactor=1.0):
         """
         -----------------------------------------------
         -- Script to Conduct Multple-Stripe Analysis --
@@ -1541,7 +1531,7 @@ class Main(Builder, BridgeSummary, PierInfo):
                 GMdt = dts[iii]
 
                 # Try changing time step of analysis if the analysis does not converge
-                Dts_NRHA = [GMdt*DtFactor for DtFactor in DtFactors]
+                Dts_NRHA = [0.001, 0.0005]
 
                 if excitation == 'Uniform':
                     GMs = [gm_names[iii] for gm_names in GM_uniform]
@@ -1722,7 +1712,7 @@ class Main(Builder, BridgeSummary, PierInfo):
                     # self.set_recorders(out_dir2)
                         
                     Mdrft, cIndex, mpier, mdrft, mudisp, muK, anlys, abutdisps = \
-                        Analysis.nrha_multiple(self, DtAnalysis, tFinal, Dc, '',  2)
+                        Analysis.nrha_multiple(self, DtAnalysis, tFinal, Dc, '',  1)
                 time_text = RunTime(startT)
                 log.write(gm_text + '\n')
                 log.write(anlys + '\n')
