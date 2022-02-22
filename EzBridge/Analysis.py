@@ -599,12 +599,6 @@ def nrha_single(obj, Dt, Tmax, Dc, log, pflag=0):
                 if cdrft >= mdrft[i]: mdrft[i] = cdrft
                 if cdrft > Mdrft: Mdrft = cdrft; mflr = i + 1  # Update the current maximum pier drift and where it is
 
-            # Test gap element
-            # forces.append(ops.basicForce(obj.EleIDsGap[0][3]))
-            # disp.append(ops.basicDeformation(obj.EleIDsGap[0][3]))
-            # forces2.append(ops.basicForce(obj.EleIDsBearing[0][3])[2])
-            # disp2.append(ops.basicDeformation(obj.EleIDsBearing[0][3])[2])
-
             if Mdrft >= Dc: 
                 cIndex = 1 
                 Mdrft = Dc
