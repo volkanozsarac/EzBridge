@@ -1869,8 +1869,8 @@ class Builder(RC_Circular):
             gap = self.model['Abutment_BackFill']['gap']
             skew1 = self.skew[0]
             skew2 = self.skew[-1]
-            mass = h * w * b / 3  # approximate abutment mass
-            # mass = 0
+            # mass = h * w * b / 3  # approximate abutment mass
+            mass = 0
 
             # # Create gap elements in longitudinal direction, if gap is a nonzero value
             # if gap != 0 and self.model['Abutment_BackFill']['gapFlag'] == 1:
