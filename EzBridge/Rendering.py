@@ -198,15 +198,14 @@ def plot_model(obj, show_node_tags='no', show_element_tags='no', show_node='no')
     yViewCenter = (nodeMins[1] + nodeMaxs[1]) / 2
     zViewCenter = (nodeMins[2] + nodeMaxs[2]) / 2
     view_range = max(max(x) - min(x), max(y) - min(y), max(z) - min(z))
-    ax.set_xlim(xViewCenter - (view_range / 4), xViewCenter + (view_range / 4))
+    ax.set_xlim(xViewCenter - (view_range / 3), xViewCenter + (view_range / 3))
     ax.set_ylim(yViewCenter - (view_range / 4), yViewCenter + (view_range / 4))
-    ax.set_zlim(zViewCenter - (view_range / 3), zViewCenter + (view_range / 3))
-
+    ax.set_zlim(zViewCenter - (view_range / 5), zViewCenter + (view_range / 5))
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
     ax.text2D(0.10, 0.95, "Undeformed shape", transform=ax.transAxes, fontweight="bold")
-
+    ax.view_init(elev=30, azim=140)
     plt.axis('on')
     plt.show()
 
@@ -299,11 +298,12 @@ def plot_deformedshape(obj, ax=None, scale=5):
     yViewCenter = (nodeMins[1] + nodeMaxs[1]) / 2
     zViewCenter = (nodeMins[2] + nodeMaxs[2]) / 2
     view_range = max(max(x) - min(x), max(y) - min(y), max(z) - min(z))
-    ax.set_xlim(xViewCenter - (view_range / 4), xViewCenter + (view_range / 4))
+    ax.set_xlim(xViewCenter - (view_range / 3), xViewCenter + (view_range / 3))
     ax.set_ylim(yViewCenter - (view_range / 4), yViewCenter + (view_range / 4))
-    ax.set_zlim(zViewCenter - (view_range / 3), zViewCenter + (view_range / 3))
+    ax.set_zlim(zViewCenter - (view_range / 5), zViewCenter + (view_range / 5))
     ax.text2D(0.10, 0.95, "Deformed shape", transform=ax.transAxes, fontweight="bold")
     ax.text2D(0.10, 0.90, "Scale Factor: " + str(scale), transform=ax.transAxes, fontweight="bold")
+    ax.view_init(elev=30, azim=140)
     ax.axis('off')
 
 
@@ -412,11 +412,12 @@ def plot_modeshape(obj, modeNumber=1, scale=200):
     yViewCenter = (nodeMins[1] + nodeMaxs[1]) / 2
     zViewCenter = (nodeMins[2] + nodeMaxs[2]) / 2
     view_range = max(max(x) - min(x), max(y) - min(y), max(z) - min(z))
-    ax.set_xlim(xViewCenter - (view_range / 4), xViewCenter + (view_range / 4))
+    ax.set_xlim(xViewCenter - (view_range / 3), xViewCenter + (view_range / 3))
     ax.set_ylim(yViewCenter - (view_range / 4), yViewCenter + (view_range / 4))
-    ax.set_zlim(zViewCenter - (view_range / 3), zViewCenter + (view_range / 3))
+    ax.set_zlim(zViewCenter - (view_range / 5), zViewCenter + (view_range / 5))
     ax.text2D(0.10, 0.95, "Mode " + str(modeNumber), transform=ax.transAxes, fontweight="bold")
     ax.text2D(0.10, 0.90, "T = " + str("%.3f" % Tn[modeNumber-1]) + " s", transform=ax.transAxes, fontweight="bold")
+    ax.view_init(elev=30, azim=140)
     plt.axis('off')
     plt.show()
     ops.wipeAnalysis()
@@ -794,18 +795,12 @@ def animate_nrha(obj):
     zViewCenter = (nodeMins[2] + nodeMaxs[2]) / 2
     view_range = max(max(x) - min(x), max(y) - min(y), max(z) - min(z))
     plt.grid(True)
-    xmin = xViewCenter - (view_range / 4 * 1.3)
-    xmax = xViewCenter + (view_range / 4) * 1.1
-    ymin = yViewCenter - (view_range / 5)
-    ymax = yViewCenter + (view_range / 5)
-    zmin = zViewCenter - (view_range / 10)
-    zmax = zViewCenter + (view_range / 10)
-    ax.set_xlim(xmin, xmax)
-    ax.set_ylim(ymin, ymax)
-    ax.set_zlim(zmin, zmax)
+    ax.set_xlim(xViewCenter - (view_range / 3), xViewCenter + (view_range / 3))
+    ax.set_ylim(yViewCenter - (view_range / 4), yViewCenter + (view_range / 4))
+    ax.set_zlim(zViewCenter - (view_range / 5), zViewCenter + (view_range / 5))
     ax.text2D(0.10, 0.95, "Deformed shape", transform=ax.transAxes, fontweight="bold")
     ax.text2D(0.10, 0.90, "Scale Factor: " + str(scale), transform=ax.transAxes, fontweight="bold")
-    ax.view_init(elev=60, azim=120)
+    ax.view_init(elev=30, azim=140)
     ax.set_xticklabels([])
     ax.set_yticklabels([])
     ax.set_zticklabels([])
