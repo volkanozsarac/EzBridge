@@ -517,10 +517,16 @@ def get_pyParam_clay(pyDepth, sigV, cu, eps50, b, pEleLength, clay='soft clay', 
     if mSwitch == 1:
         # Emprical constant
         J = 0.5
-
-        pu1 = (3 + sigV / cu + J * pyDepth / b) * cu * b
-        pu2 = 9 * cu * b
-        pu = min(pu1, pu2)
+        # pu1 = (3 + sigV / cu + J * pyDepth / b) * cu * b
+        # pu2 = 9 * cu * b
+        # pu = min(pu1, pu2)
+        
+        gamma = sigV/pyDepth
+        x_r = 6*b/(gamma*b/cu+J)
+        if pyDepth<x_r:
+            pu = (3 + sigV / cu + J * pyDepth / b) * cu * b
+        else:
+            pu = 9 * cu * b
         y50 = 2.5 * eps50 * b
         pult = pu * pEleLength
         y = np.logspace(-4, 0, num=20)
