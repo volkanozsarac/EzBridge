@@ -8,6 +8,10 @@ The package comprises two modules to perform structural analysis and risk calcul
 
 ***
 
+
+https://user-images.githubusercontent.com/46993652/229188896-512ec509-de04-4941-b787-befb96f44355.mp4
+
+
 ## EzBridge.smat: Structural Modelling and Analysis Tool
 The purpose of the EzBridge.smat, as the name implies, is to generate numerical models for  ordinary RC bridges and to perform structural analysis in a practical way. It takes advantage of the open-source finite element software framework OpenSeesPy [McKenna et al. 2010; Zhu et al. 2018], which is computationally efficient and contains a large library of material models for typical civil engineering structures.
 
@@ -32,3 +36,9 @@ The general purpose of the accompanying module, EzBridge.rct, is to perform risk
 
 ## Reference
 Ozsarac V. Integrated Evaluation of Earthquake-Induced Economic Losses for Multi-Span Reinforced Concrete Bridges. University School for Advanced Studies IUSS Pavia, 2023.
+
+
+https://user-images.githubusercontent.com/46993652/229188926-7b966502-6f58-4f4c-b771-344208b126f9.mp4
+
+
+https://user-images.githubusercontent.com/46993652/229188515-c70f1e3e-cd29-4b6c-84aa-6120941b7c7d.mp4
