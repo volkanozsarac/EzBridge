@@ -143,9 +143,9 @@ class _builder:
         # JOINT INFORMATION
         # TODO: instead of coordinates provide span lengths, radius of curvature, and skew angles at joints
         # TODO: retrieve DXs, DYs, DZs, skew angles based on these.
-        xs = np.array(self.model['General']['Joint Xs']).astype(np.float)  # Joint coordinates, x
-        ys = np.array(self.model['General']['Joint Ys']).astype(np.float)  # Joint coordinates, y
-        zs = np.array(self.model['General']['Joint Zs']).astype(np.float)  # Joint coordinates, z
+        xs = np.array(self.model['General']['Joint Xs']).astype('float')  # Joint coordinates, x
+        ys = np.array(self.model['General']['Joint Ys']).astype('float')  # Joint coordinates, y
+        zs = np.array(self.model['General']['Joint Zs']).astype('float')  # Joint coordinates, z
 
         #  ----------------------------------------------------------------------------
         #  1-) CREATE SPAN NODES
