@@ -1,0 +1,5 @@
+openseespy
+matplotlib
+numpy
+scipy
+numba
