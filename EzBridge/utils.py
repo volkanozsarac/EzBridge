@@ -449,12 +449,37 @@ def ecdf(data):
     return x, y
 
 
-@nb.jit
+def normal_cdf(x):
+    """
+    Details
+    -------
+    Computes cumulative distribution function (CDF) for standard normal distribution
+
+    Parameters
+    ----------
+    x: numpy.ndarray
+        array of data where CDF for standard normal distribution is being calculated
+
+    Returns
+    -------
+    probs: numpy.ndarray
+        probability values of CDF for standard normal distribution given x
+    """
+
+    if np.array(x).ndim == 0:
+        x = np.array([x])
+    
+    probs = numba_cdf(x)
+
+    return probs
+
+
+@nb.njit
 def numba_cdf(x):
     """
     Details
     -------
-    Computes cumulative distribution function (CDF) for normal distribution
+    Computes cumulative distribution function (CDF) for standard normal distribution
 
     Parameters
     ----------
@@ -464,7 +489,7 @@ def numba_cdf(x):
     Returns
     -------
     probs: numpy.ndarray
-        probability values of CDF for normal distribution given x
+        probability values of CDF for standard normal distribution given x
     """
 
     val = x / (2 ** 0.5)
@@ -479,10 +504,10 @@ def numba_cdf(x):
                         (-1.13520398 + t *
                          (1.48851587 + t *
                           (-.82215223 + t * .17087277)))))))))
-    if x >= 0:
-        probs = 1 - 0.5 * r
-    else:
-        probs = 1 - 0.5 * (2. - r)
+
+    probs = 1 - 0.5 * r
+
+    probs[x < 0] = 1 - 0.5 * (2. - r[x < 0])
 
     return probs
 

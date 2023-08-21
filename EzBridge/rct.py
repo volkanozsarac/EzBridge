@@ -19,7 +19,7 @@ import copy
 import matplotlib.pyplot as plt
 import matplotlib
 import os
-from .utils import get_distance, get_units, create_dir, mle_fit, find_nearest, ecdf, numba_cdf, do_sampling
+from .utils import get_distance, get_units, create_dir, mle_fit, find_nearest, ecdf, normal_cdf, do_sampling
 
 class _cost:
     """
@@ -1855,9 +1855,9 @@ class msa:
                                 abut_idx = 1
                             # Compute losses for abutment
                             edp_comp = demand[abut_idx_map[abut_idx]]
-                            poedls1 = numba_cdf((np.log(edp_comp / abut_dls1[abut_idx, 0])) / abut_dls1[abut_idx, 1])
-                            poedls2 = numba_cdf((np.log(edp_comp / abut_dls2[abut_idx, 0])) / abut_dls2[abut_idx, 1])
-                            poedls3 = numba_cdf((np.log(edp_comp / abut_dls3[abut_idx, 0])) / abut_dls3[abut_idx, 1])
+                            poedls1 = normal_cdf((np.log(edp_comp / abut_dls1[abut_idx, 0])) / abut_dls1[abut_idx, 1])
+                            poedls2 = normal_cdf((np.log(edp_comp / abut_dls2[abut_idx, 0])) / abut_dls2[abut_idx, 1])
+                            poedls3 = normal_cdf((np.log(edp_comp / abut_dls3[abut_idx, 0])) / abut_dls3[abut_idx, 1])
                             if poedls3 > poedls2:
                                 poedls2 = 0
                             if poedls2 > poedls1:
@@ -1904,11 +1904,11 @@ class msa:
                             edp_group = demand[bent_idx_map[bent_tag]]
                             for k in range(len(edp_group)):
                                 edp_comp = edp_group[k]
-                                poedls1 = numba_cdf(
+                                poedls1 = normal_cdf(
                                     (np.log(edp_comp / piers_dls1[bent_tag][k, 0])) / piers_dls1[bent_tag][k, 1])
-                                poedls2 = numba_cdf(
+                                poedls2 = normal_cdf(
                                     (np.log(edp_comp / piers_dls2[bent_tag][k, 0])) / piers_dls2[bent_tag][k, 1])
-                                poedls3 = numba_cdf(
+                                poedls3 = normal_cdf(
                                     (np.log(edp_comp / piers_dls3[bent_tag][k, 0])) / piers_dls3[bent_tag][k, 1])
                                 if poedls3 > poedls2:
                                     poedls2 = 0
@@ -1971,11 +1971,11 @@ class msa:
                             edp_group = demand[bearing_idx_map[joint]]
                             for k in range(len(edp_group)):  # for bearings
                                 edp_comp = edp_group[k]
-                                poedls1 = numba_cdf(
+                                poedls1 = normal_cdf(
                                     (np.log(edp_comp / bearing_dls1[joint][k, 0])) / bearing_dls1[joint][k, 1])
-                                poedls2 = numba_cdf(
+                                poedls2 = normal_cdf(
                                     (np.log(edp_comp / bearing_dls2[joint][k, 0])) / bearing_dls2[joint][k, 1])
-                                poedls3 = numba_cdf(
+                                poedls3 = normal_cdf(
                                     (np.log(edp_comp / bearing_dls3[joint][k, 0])) / bearing_dls3[joint][k, 1])
                                 if poedls3 > poedls2:
                                     poedls2 = 0
