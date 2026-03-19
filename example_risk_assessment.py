@@ -22,7 +22,7 @@ if __name__ == '__main__':
             zip_ref.extractall(directory_to_extract_to)
 
         # Perform risk assessment
-        risk_obj = rct.msa(input_folder=input_folder, output_folder=output_folder)
+        risk_obj = rct.msa(input_folder=input_folder, output_folder=output_folder, num_crews=1)
         risk_obj.compute_all(plot=1)
 
         # Remove input folder
