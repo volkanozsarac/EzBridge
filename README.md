@@ -15,7 +15,6 @@ The purpose of the EzBridge.smat, as the name implies, is to generate numerical 
 | ------------- | ------------- |
 | Gravity  | do_gravity(*args) |
 | Modal analysis | do_modal(*args) |
-| Modal analysis | do_modal(*args) |
 | Response spectrum analysis | do_rsa(*args) |
 | Nonlinear static pushover analysis (uniform loading) | do_nspa(scheme='UNI', *args) |
 | Nonlinear static pushover analysis (fundamental mode proportional loading) | do_nspa(scheme='FMP', *args) |
