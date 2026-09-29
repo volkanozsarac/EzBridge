@@ -31,6 +31,7 @@ The general purpose of the accompanying module, EzBridge.rct, is to perform risk
 
 ## Reference
 Ozsarac, V., & Monteiro, R. (2026). Performance-based integrated assessment of earthquake-induced economic losses for reinforced concrete bridges. Resilient Cities and Structures, 5(4), 32–46. https://doi.org/10.1016/j.rcns.2026.09.004
+
 Ozsarac V. Integrated Evaluation of Earthquake-Induced Economic Losses for Multi-Span Reinforced Concrete Bridges. University School for Advanced Studies IUSS Pavia, 2023.
 
 
